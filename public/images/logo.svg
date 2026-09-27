@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Optik ERP">
+    <defs>
+        <linearGradient id="lensStroke" x1="12" y1="22" x2="52" y2="46" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#ffffff"/>
+            <stop offset="1" stop-color="#cbd5e1"/>
+        </linearGradient>
+        <linearGradient id="badgeFill" x1="0" y1="0" x2="64" y2="64" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#ef4444"/>
+            <stop offset="1" stop-color="#dc2626"/>
+        </linearGradient>
+    </defs>
+    <rect width="64" height="64" rx="16" fill="url(#badgeFill)"/>
+    <g fill="none" stroke="url(#lensStroke)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M7.5 26.5 12 31"/>
+        <path d="M56.5 26.5 52 31"/>
+        <path d="M30.4 32.6c1.8-1.6 3.4-1.6 5.2 0"/>
+        <path d="M30.5 34H21a9.5 9.5 0 1 1 6.4-16.5"/>
+        <path d="M35.5 34H44a9.5 9.5 0 1 0-6.4-16.5"/>
+    </g>
+    <circle cx="21" cy="34" r="9.5" fill="#ffffff" fill-opacity="0.14"/>
+    <circle cx="43" cy="34" r="9.5" fill="#ffffff" fill-opacity="0.14"/>
+</svg>

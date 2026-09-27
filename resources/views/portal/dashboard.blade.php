@@ -4,15 +4,15 @@
 
 @section('content')
     <!-- Membership card -->
-    <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-emerald-900 p-6 text-white shadow-xl">
-        <div class="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-emerald-500/20 blur-3xl"></div>
+    <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-red-900 p-6 text-white shadow-xl">
+        <div class="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-red-500/20 blur-3xl"></div>
         <div class="relative">
             <div class="flex items-start justify-between">
                 <div>
-                    <p class="text-[10px] uppercase tracking-[0.25em] text-emerald-400">Kartu Member Digital</p>
+                    <p class="text-[10px] uppercase tracking-[0.25em] text-red-400">Kartu Member Digital</p>
                     <p class="mt-3 font-mono text-2xl font-extrabold tracking-widest">{{ $customer->member_id }}</p>
                 </div>
-                <span class="rounded-full bg-emerald-500/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-emerald-300">
+                <span class="rounded-full bg-red-500/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300">
                     {{ $customer->status === 'active' ? 'Aktif' : 'Nonaktif' }}
                 </span>
             </div>
@@ -23,7 +23,7 @@
             <div class="mt-5 flex items-end justify-between border-t border-white/10 pt-4">
                 <div>
                     <p class="text-[10px] uppercase tracking-wider text-slate-500">Total Belanja</p>
-                    <p class="text-xl font-extrabold text-emerald-400">@idr($customer->totalSpend())</p>
+                    <p class="text-xl font-extrabold text-red-400">@idr($customer->totalSpend())</p>
                 </div>
                 <div class="text-right">
                     <p class="text-[10px] uppercase tracking-wider text-slate-500">Total Order</p>
@@ -47,7 +47,7 @@
     <section class="mt-6">
         <div class="mb-3 flex items-center justify-between">
             <h2 class="text-sm font-bold text-slate-900">Resep Aktif</h2>
-            <a href="{{ route('portal.prescriptions') }}" class="text-xs font-semibold text-emerald-600">Semua resep</a>
+            <a href="{{ route('portal.prescriptions') }}" class="text-xs font-semibold text-red-600">Semua resep</a>
         </div>
 
         @if ($latestPrescription)
@@ -85,7 +85,7 @@
     <section class="mt-6">
         <div class="mb-3 flex items-center justify-between">
             <h2 class="text-sm font-bold text-slate-900">Status Pesanan Terkini</h2>
-            <a href="{{ route('portal.transactions') }}" class="text-xs font-semibold text-emerald-600">Semua transaksi</a>
+            <a href="{{ route('portal.transactions') }}" class="text-xs font-semibold text-red-600">Semua transaksi</a>
         </div>
 
         @if ($latestTransaction)
@@ -108,11 +108,11 @@
                             @php($done = array_search($key, array_keys($steps), true) <= $current)
                             <div class="flex items-center {{ $loop->last ? '' : 'flex-1' }}">
                                 <div class="flex flex-col items-center gap-1">
-                                    <span class="grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold {{ $done ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-400' }}">✓</span>
-                                    <span class="text-[9px] font-semibold {{ $done ? 'text-emerald-600' : 'text-slate-400' }}">{{ $label }}</span>
+                                    <span class="grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold {{ $done ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-400' }}">✓</span>
+                                    <span class="text-[9px] font-semibold {{ $done ? 'text-red-600' : 'text-slate-400' }}">{{ $label }}</span>
                                 </div>
                                 @unless ($loop->last)
-                                    <span class="mx-1 mb-4 h-1 flex-1 rounded {{ $done ? 'bg-emerald-400' : 'bg-slate-200' }}"></span>
+                                    <span class="mx-1 mb-4 h-1 flex-1 rounded {{ $done ? 'bg-red-400' : 'bg-slate-200' }}"></span>
                                 @endunless
                             </div>
                         @endforeach
@@ -122,7 +122,7 @@
                 @endif
 
                 <div class="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
-                    <span class="rounded-full {{ $latestTransaction->payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }} px-2.5 py-1 font-bold uppercase">
+                    <span class="rounded-full {{ $latestTransaction->payment_status === 'paid' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }} px-2.5 py-1 font-bold uppercase">
                         {{ $latestTransaction->payment_status === 'paid' ? 'Lunas' : 'DP' }}
                     </span>
                     <span class="text-slate-500 capitalize">{{ str_replace('_', ' ', $latestTransaction->payment_method) }}</span>
@@ -139,17 +139,17 @@
     <section class="mt-6">
         <div class="mb-3 flex items-center justify-between">
             <h2 class="text-sm font-bold text-slate-900">Promo Untuk Anda</h2>
-            <a href="{{ route('portal.promos') }}" class="text-xs font-semibold text-emerald-600">Semua promo</a>
+            <a href="{{ route('portal.promos') }}" class="text-xs font-semibold text-red-600">Semua promo</a>
         </div>
         <div class="space-y-3">
             @forelse ($promotions as $promo)
-                <div class="rounded-2xl border border-emerald-100 bg-gradient-to-r from-emerald-50 to-white p-4 shadow-sm">
+                <div class="rounded-2xl border border-red-100 bg-gradient-to-r from-red-50 to-white p-4 shadow-sm">
                     <div class="flex items-center justify-between">
                         <div>
                             <p class="text-sm font-bold text-slate-900">{{ $promo->name }}</p>
                             <p class="text-xs text-slate-500">{{ \Illuminate\Support\Str::limit($promo->description, 70) }}</p>
                         </div>
-                        <span class="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-extrabold text-white">
+                        <span class="rounded-lg bg-red-600 px-3 py-1.5 text-xs font-extrabold text-white">
                             {{ $promo->promo_type === 'nominal' ? '-'.number_format((float) $promo->discount_value) : rtrim(rtrim(number_format((float) $promo->discount_value, 2), '0'), '.').'%' }}
                         </span>
                     </div>

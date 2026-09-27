@@ -7,10 +7,10 @@
     <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <form method="GET" action="{{ route('prescriptions.index') }}" class="flex flex-1 items-center gap-2">
             <input type="text" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Cari customer / dokter..."
-                   class="w-full max-w-sm rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                   class="w-full max-w-sm rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20">
             <button class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Cari</button>
         </form>
-        <a href="{{ route('prescriptions.create') }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600">
+        <a href="{{ route('prescriptions.create') }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700">
             <i data-lucide="plus" class="h-4 w-4"></i> Input Resep Baru
         </a>
     </div>
@@ -43,6 +43,7 @@
                             <td class="px-5 py-3 text-center font-mono text-xs text-slate-700">{{ $rx->os_sph }}/{{ $rx->os_cyl }}×{{ $rx->os_axis }}</td>
                             <td class="px-5 py-3 text-right">
                                 <a href="{{ route('prescriptions.show', $rx) }}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">Lihat</a>
+                                <a href="{{ route('prescriptions.edit', $rx) }}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">Edit</a>
                             </td>
                         </tr>
                     @empty

@@ -6,7 +6,7 @@
 @section('content')
     <div class="mb-5 flex items-center justify-between">
         <p class="text-sm text-slate-500">Berlaku otomatis di POS saat syarat terpenuhi.</p>
-        <a href="{{ route('promotions.create') }}" class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600">
+        <a href="{{ route('promotions.create') }}" class="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700">
             <i data-lucide="plus" class="h-4 w-4"></i> Tambah Promo
         </a>
     </div>
@@ -48,7 +48,7 @@
                             </td>
                             <td class="px-5 py-3 text-center text-slate-600">{{ $promo->transactions_count }}</td>
                             <td class="px-5 py-3">
-                                <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $promo->is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500' }}">
+                                <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $promo->is_active ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500' }}">
                                     {{ $promo->is_active ? 'AKTIF' : 'NONAKTIF' }}
                                 </span>
                             </td>

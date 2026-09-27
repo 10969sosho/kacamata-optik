@@ -13,6 +13,9 @@ class CustomerController extends Controller
     {
         $customers = Customer::query()
             ->withCount('transactions')
+            ->withSum(['transactions as total_spending' => fn ($q) => $q->whereNotIn('status', ['cancelled', 'refunded'])], 'total_amount')
+            ->withMax(['transactions as last_transaction_at' => fn ($q) => $q->whereNotIn('status', ['cancelled', 'refunded'])], 'transaction_date')
+            ->withMax('prescriptions as last_exam_at', 'examination_date')
             ->when($request->filled('q'), fn ($q) => $q->where(
                 fn ($w) => $w->where('name', 'like', "%{$request->string('q')}%")
                     ->orWhere('phone', 'like', "%{$request->string('q')}%")
@@ -22,6 +25,11 @@ class CustomerController extends Controller
             ->orderBy('name')
             ->paginate(10)
             ->withQueryString();
+
+        $customers->getCollection()->each(function (Customer $customer): void {
+            $lastExam = $customer->last_exam_at ?: $customer->last_transaction_at;
+            $customer->needs_exam_reminder = $lastExam === null || strtotime((string) $lastExam) < strtotime('-1 year');
+        });
 
         return view('customers.index', [
             'customers' => $customers,

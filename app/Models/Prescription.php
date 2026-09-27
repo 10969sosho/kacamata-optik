@@ -7,6 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Prescription extends Model
 {
+    /** @var array<string, string> */
+    protected $attributes = [
+        'prescription_type' => 'Distance',
+    ];
+
     /** @var list<string> */
     protected $fillable = [
         'customer_id',

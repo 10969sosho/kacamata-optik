@@ -7,8 +7,8 @@
     <div class="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <form method="GET" action="{{ route('frames.index') }}" class="flex flex-1 flex-wrap items-center gap-2">
             <input type="text" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="Cari SKU / nama / barcode..."
-                   class="w-full max-w-xs rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 sm:w-64">
-            <select name="brand" class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                   class="w-full max-w-xs rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 sm:w-64">
+            <select name="brand" class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                 <option value="">Semua Brand</option>
                 @foreach ($brands as $brand)
                     <option value="{{ $brand }}" @selected(($filters['brand'] ?? '') === $brand)>{{ $brand }}</option>
@@ -16,7 +16,7 @@
             </select>
             <button class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Filter</button>
         </form>
-        <a href="{{ route('frames.create') }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600">
+        <a href="{{ route('frames.create') }}" class="inline-flex items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700">
             <i data-lucide="plus" class="h-4 w-4"></i> Tambah Frame
         </a>
     </div>
@@ -50,7 +50,7 @@
                                 @elseif ($frame->isLowStock())
                                     <span class="rounded-full bg-amber-100 px-2.5 py-1 text-[11px] font-bold text-amber-700">LOW {{ $frame->stock }}</span>
                                 @else
-                                    <span class="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-emerald-700">{{ $frame->stock }}</span>
+                                    <span class="rounded-full bg-red-100 px-2.5 py-1 text-[11px] font-bold text-red-700">{{ $frame->stock }}</span>
                                 @endif
                             </td>
                             <td class="px-5 py-3 text-right">

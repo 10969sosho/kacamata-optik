@@ -8,11 +8,11 @@
         <div>
             <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Invoice</label>
             <input type="text" name="q" value="{{ $filters['q'] ?? '' }}" placeholder="TRX-..."
-                   class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                   class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
         </div>
         <div>
             <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Status</label>
-            <select name="status" class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+            <select name="status" class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                 <option value="">Semua</option>
                 @foreach ($statuses as $s)
                     <option value="{{ $s }}" @selected(($filters['status'] ?? '') === $s)>{{ ucfirst($s) }}</option>
@@ -21,14 +21,14 @@
         </div>
         <div>
             <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Dari</label>
-            <input type="date" name="from" value="{{ $filters['from'] ?? '' }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+            <input type="date" name="from" value="{{ $filters['from'] ?? '' }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
         </div>
         <div>
             <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Sampai</label>
-            <input type="date" name="to" value="{{ $filters['to'] ?? '' }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+            <input type="date" name="to" value="{{ $filters['to'] ?? '' }}" class="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
         </div>
         <button class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Filter</button>
-        <a href="{{ route('pos.create') }}" class="ml-auto rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600">+ Transaksi Baru</a>
+        <a href="{{ route('transactions.create') }}" class="ml-auto rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700">+ Buat Transaksi</a>
     </form>
 
     <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -55,7 +55,7 @@
                             <td class="px-5 py-3 text-slate-600">{{ $trx->staff?->name ?? '-' }}</td>
                             <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($trx->total_amount)</td>
                             <td class="px-5 py-3">
-                                <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $trx->payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">
+                                <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $trx->payment_status === 'paid' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">
                                     {{ $trx->payment_status === 'paid' ? 'LUNAS' : 'DP' }}
                                 </span>
                             </td>

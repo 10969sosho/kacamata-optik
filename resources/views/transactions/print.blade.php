@@ -20,6 +20,7 @@
 
         <div class="rounded-2xl bg-white p-6 shadow-sm">
             <div class="border-b-2 border-dashed border-slate-300 pb-4 text-center">
+                <img src="{{ asset('images/logo.svg') }}" alt="Logo" class="mx-auto mb-2 h-10 w-10 rounded-xl">
                 <p class="text-lg font-extrabold tracking-tight text-slate-900">{{ $transaction->store?->name ?? 'OPTIK' }}</p>
                 <p class="text-xs text-slate-500">{{ $transaction->store?->address ?? '' }}</p>
                 <p class="text-xs text-slate-500">{{ $transaction->store?->phone ?? '' }}</p>
@@ -66,7 +67,7 @@
                 <div class="flex justify-between"><span class="text-slate-500">Diskon {{ $transaction->promotion?->name ? '· '.$transaction->promotion->name : '' }}</span><span class="text-rose-600">-@idr($transaction->discount_amount)</span></div>
                 <div class="flex justify-between text-base font-extrabold text-slate-900"><span>TOTAL</span><span>@idr($transaction->total_amount)</span></div>
                 <div class="flex justify-between"><span class="text-slate-500">Metode Bayar</span><span class="capitalize">{{ $transaction->payment_method }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Status Bayar</span><span class="font-bold {{ $transaction->payment_status === 'paid' ? 'text-emerald-600' : 'text-amber-600' }}">{{ $transaction->payment_status === 'paid' ? 'LUNAS' : 'DP / UANG MUKA' }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Status Bayar</span><span class="font-bold {{ $transaction->payment_status === 'paid' ? 'text-red-600' : 'text-amber-600' }}">{{ $transaction->payment_status === 'paid' ? 'LUNAS' : 'DP / UANG MUKA' }}</span></div>
                 <div class="flex justify-between"><span class="text-slate-500">Status Pesanan</span><span class="capitalize">{{ $transaction->status }}</span></div>
                 @if ($transaction->balanceDue() > 0)
                     <div class="flex justify-between font-bold text-rose-600"><span>Sisa Tagihan</span><span>@idr($transaction->balanceDue())</span></div>

@@ -12,7 +12,10 @@
     <div class="mx-auto max-w-3xl px-4 py-8">
         <div class="mb-4 flex items-center justify-between no-print">
             <a href="{{ url()->previous() }}" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600">← Kembali</a>
-            <button onclick="window.print()" class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Cetak Resep</button>
+            <div class="flex gap-2">
+                <a href="{{ route('prescriptions.edit', $prescription) }}" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-600">Edit Resep</a>
+                <button onclick="window.print()" class="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white">Cetak Resep</button>
+            </div>
         </div>
 
         <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">

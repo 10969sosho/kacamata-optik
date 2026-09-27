@@ -17,11 +17,11 @@
                         @php($done = array_search($key, array_keys($steps), true) <= $current)
                         <div class="flex items-center {{ $loop->last ? '' : 'flex-1' }}">
                             <div class="flex flex-col items-center gap-1">
-                                <span class="grid h-8 w-8 place-items-center rounded-full text-xs font-bold {{ $done ? 'bg-emerald-500 text-white' : 'bg-slate-200 text-slate-500' }}">✓</span>
-                                <span class="text-[10px] font-semibold {{ $done ? 'text-emerald-600' : 'text-slate-400' }}">{{ $label }}</span>
+                                <span class="grid h-8 w-8 place-items-center rounded-full text-xs font-bold {{ $done ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-500' }}">✓</span>
+                                <span class="text-[10px] font-semibold {{ $done ? 'text-red-600' : 'text-slate-400' }}">{{ $label }}</span>
                             </div>
                             @unless ($loop->last)
-                                <span class="mx-1 mb-4 h-1 flex-1 rounded {{ $done ? 'bg-emerald-400' : 'bg-slate-200' }}"></span>
+                                <span class="mx-1 mb-4 h-1 flex-1 rounded {{ $done ? 'bg-red-400' : 'bg-slate-200' }}"></span>
                             @endunless
                         </div>
                     @endforeach
@@ -33,7 +33,7 @@
             <div class="flex flex-wrap items-center gap-2">
                 <form method="POST" action="{{ route('transactions.status', $transaction) }}" class="flex items-center gap-2">
                     @csrf @method('PATCH')
-                    <select name="status" class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                    <select name="status" class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                         @foreach (['ordered', 'processing', 'ready', 'completed', 'cancelled'] as $s)
                             <option value="{{ $s }}" @selected($transaction->status === $s)>{{ ucfirst($s) }}</option>
                         @endforeach
@@ -103,12 +103,12 @@
                     <div class="flex justify-between"><dt class="text-slate-500">Subtotal</dt><dd class="font-semibold text-slate-800">@idr($transaction->subtotal)</dd></div>
                     <div class="flex justify-between"><dt class="text-slate-500">Diskon {!! $transaction->promotion ? '('.e($transaction->promotion->name).')' : '' !!}</dt><dd class="font-semibold text-rose-600">-@idr($transaction->discount_amount)</dd></div>
                     <div class="flex justify-between border-t border-slate-100 pt-2.5 text-base font-extrabold"><dt class="text-slate-900">Total</dt><dd class="text-slate-900">@idr($transaction->total_amount)</dd></div>
-                    <div class="flex justify-between"><dt class="text-slate-500">Dibayar</dt><dd class="font-semibold text-emerald-600">@idr($transaction->amountPaid())</dd></div>
+                    <div class="flex justify-between"><dt class="text-slate-500">Dibayar</dt><dd class="font-semibold text-red-600">@idr($transaction->amountPaid())</dd></div>
                     <div class="flex justify-between"><dt class="text-slate-500">Sisa Tagihan</dt><dd class="font-semibold text-rose-600">@idr($transaction->balanceDue())</dd></div>
                 </dl>
                 <div class="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wider">
                     <span class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 capitalize">{{ $transaction->payment_method }}</span>
-                    <span class="rounded-full px-2.5 py-1 {{ $transaction->payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">{{ $transaction->payment_status }}</span>
+                    <span class="rounded-full px-2.5 py-1 {{ $transaction->payment_status === 'paid' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">{{ $transaction->payment_status }}</span>
                 </div>
             </div>
 
@@ -117,11 +117,11 @@
                 @if ($transaction->customer)
                     <p class="font-semibold text-slate-900">{{ $transaction->customer->name }}</p>
                     <p class="text-sm text-slate-500">{{ $transaction->customer->phone }}</p>
-                    <p class="mt-1 font-mono text-xs font-bold text-emerald-700">{{ $transaction->customer->member_id }}</p>
-                    <a href="{{ route('customers.show', $transaction->customer) }}" class="mt-3 block text-xs font-semibold text-emerald-600 hover:underline">Lihat profil →</a>
+                    <p class="mt-1 font-mono text-xs font-bold text-red-700">{{ $transaction->customer->member_id }}</p>
+                    <a href="{{ route('customers.show', $transaction->customer) }}" class="mt-3 block text-xs font-semibold text-red-600 hover:underline">Lihat profil →</a>
                 @endif
                 @if ($transaction->prescription)
-                    <a href="{{ route('prescriptions.show', $transaction->prescription) }}" class="mt-3 block text-xs font-semibold text-emerald-600 hover:underline">Lihat resep terkait →</a>
+                    <a href="{{ route('prescriptions.show', $transaction->prescription) }}" class="mt-3 block text-xs font-semibold text-red-600 hover:underline">Lihat resep terkait →</a>
                 @endif
                 <p class="mt-4 text-xs text-slate-400">Kasir: {{ $transaction->staff?->name ?? '-' }} · {{ $transaction->store?->name ?? '-' }}</p>
             </div>

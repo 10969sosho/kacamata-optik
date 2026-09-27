@@ -7,15 +7,15 @@
     <form method="GET" action="{{ route('reports.index') }}" class="mb-6 flex flex-wrap items-end gap-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div>
             <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Dari Tanggal</label>
-            <input type="date" name="from" value="{{ $filters['from'] ?? '' }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+            <input type="date" name="from" value="{{ $filters['from'] ?? '' }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
         </div>
         <div>
             <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Sampai</label>
-            <input type="date" name="to" value="{{ $filters['to'] ?? '' }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+            <input type="date" name="to" value="{{ $filters['to'] ?? '' }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
         </div>
         <div>
             <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Staff Kasir</label>
-            <select name="staff_id" class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+            <select name="staff_id" class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                 <option value="">Semua</option>
                 @foreach ($staff as $s)
                     <option value="{{ $s->id }}" @selected((string) ($filters['staff_id'] ?? '') === (string) $s->id)>{{ $s->name }}</option>
@@ -24,15 +24,24 @@
         </div>
         <div>
             <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Status Bayar</label>
-            <select name="payment_status" class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+            <select name="payment_status" class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                 <option value="">Semua</option>
                 @foreach (['paid' => 'Lunas', 'down_payment' => 'DP', 'unpaid' => 'Belum Bayar'] as $value => $label)
                     <option value="{{ $value }}" @selected(($filters['payment_status'] ?? '') === $value)>{{ $label }}</option>
                 @endforeach
             </select>
         </div>
+        <div>
+            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Tipe Produk</label>
+            <select name="item_type" class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
+                <option value="">Semua</option>
+                @foreach (['frame' => 'Frame', 'lens' => 'Lensa', 'custom' => 'Custom'] as $value => $label)
+                    <option value="{{ $value }}" @selected(($filters['item_type'] ?? '') === $value)>{{ $label }}</option>
+                @endforeach
+            </select>
+        </div>
         <button class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Terapkan</button>
-        <a href="{{ route('reports.export', $filters) }}" class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-600">
+        <a href="{{ route('reports.export', $filters) }}" class="inline-flex items-center gap-2 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700">
             <i data-lucide="download" class="h-4 w-4"></i> Download CSV
         </a>
     </form>
@@ -73,7 +82,7 @@
                     @forelse ($rows as $trx)
                         <tr class="hover:bg-slate-50">
                             <td class="px-5 py-3">
-                                <a href="{{ route('transactions.show', $trx) }}" class="font-semibold text-slate-900 hover:text-emerald-600">{{ $trx->invoice_number }}</a>
+                                <a href="{{ route('transactions.show', $trx) }}" class="font-semibold text-slate-900 hover:text-red-600">{{ $trx->invoice_number }}</a>
                             </td>
                             <td class="px-5 py-3 text-slate-600">{{ optional($trx->transaction_date)->format('d/m/Y H:i') }}</td>
                             <td class="px-5 py-3 text-slate-600">{{ $trx->customer?->name ?? '-' }}</td>

@@ -1,7 +1,7 @@
 @extends('layouts.erp')
 
-@section('title', 'POS / Kasir')
-@section('subtitle', 'Buat transaksi baru')
+@section('title', 'Buat Transaksi')
+@section('subtitle', 'Transaksi & pengerjaan kacamata baru')
 
 @push('scripts')
 <script>
@@ -142,21 +142,21 @@ function pos() {
                             <span class="grid h-6 w-6 place-items-center rounded-full bg-slate-900 text-[10px] font-bold text-white">1</span>
                             Pilih Customer
                         </h2>
-                        <button type="button" @click="quick.open = !quick.open" class="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
+                        <button type="button" @click="quick.open = !quick.open" class="rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 hover:bg-red-100">
                             + Customer Baru
                         </button>
                     </div>
 
-                    <div x-show="quick.open" x-cloak class="mb-4 grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 sm:grid-cols-[1fr_1fr_auto]">
-                        <input x-model="quick.name" placeholder="Nama customer" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
-                        <input x-model="quick.phone" placeholder="No. WhatsApp" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
-                        <button type="button" @click="saveCustomer()" :disabled="quick.busy" class="rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
+                    <div x-show="quick.open" x-cloak class="mb-4 grid gap-3 rounded-xl border border-red-200 bg-red-50/50 p-4 sm:grid-cols-[1fr_1fr_auto]">
+                        <input x-model="quick.name" placeholder="Nama customer" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
+                        <input x-model="quick.phone" placeholder="No. WhatsApp" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
+                        <button type="button" @click="saveCustomer()" :disabled="quick.busy" class="rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-50">
                             <span x-show="!quick.busy">Simpan</span><span x-show="quick.busy">...</span>
                         </button>
                     </div>
 
-                    <input x-model="custQ" type="text" placeholder="Cari nama / no. HP / Member ID..." class="mb-3 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
-                    <select name="customer_id" x-model="customer_id" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                    <input x-model="custQ" type="text" placeholder="Cari nama / no. HP / Member ID..." class="mb-3 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20">
+                    <select name="customer_id" x-model="customer_id" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                         <option value="">— Pilih customer —</option>
                         <template x-for="c in filteredCustomers()" :key="c.id">
                             <option :value="c.id" x-text="c.name + ' (' + c.member_id + ')'" :selected="c.id == customer_id"></option>
@@ -170,12 +170,12 @@ function pos() {
                         <h2 class="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
                             <span class="grid h-6 w-6 place-items-center rounded-full bg-slate-900 text-[10px] font-bold text-white">2</span> Pilih Frame
                         </h2>
-                        <input x-model="frameQ" type="text" placeholder="Filter frame..." class="mb-3 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                        <input x-model="frameQ" type="text" placeholder="Filter frame..." class="mb-3 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                         <div class="max-h-72 space-y-2 overflow-y-auto pr-1">
                             <template x-for="f in filteredFrames()" :key="f.id">
                                 <button type="button" @click="add('frame', f)"
                                         class="flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition"
-                                        :class="inCart('frame', f.id) ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'">
+                                        :class="inCart('frame', f.id) ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'">
                                     <span class="min-w-0">
                                         <span class="block truncate text-sm font-semibold text-slate-900" x-text="f.name"></span>
                                         <span class="block text-xs text-slate-500" x-text="f.brand + ' · stok ' + f.stock"></span>
@@ -190,12 +190,12 @@ function pos() {
                         <h2 class="mb-3 flex items-center gap-2 text-sm font-bold text-slate-900">
                             <span class="grid h-6 w-6 place-items-center rounded-full bg-slate-900 text-[10px] font-bold text-white">3</span> Pilih Lensa
                         </h2>
-                        <input x-model="lensQ" type="text" placeholder="Filter brand / tipe..." class="mb-3 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                        <input x-model="lensQ" type="text" placeholder="Filter brand / tipe..." class="mb-3 w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                         <div class="max-h-72 space-y-2 overflow-y-auto pr-1">
                             <template x-for="l in filteredLenses()" :key="l.id">
                                 <button type="button" @click="add('lens', l)"
                                         class="flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition"
-                                        :class="inCart('lens', l.id) ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'">
+                                        :class="inCart('lens', l.id) ? 'border-red-400 bg-red-50' : 'border-slate-200 hover:border-slate-300 hover:bg-slate-50'">
                                     <span class="min-w-0">
                                         <span class="block truncate text-sm font-semibold text-slate-900" x-text="l.name"></span>
                                         <span class="block text-xs text-slate-500" x-text="l.type + ' · ' + l.index + ' · stok ' + l.stock"></span>
@@ -215,16 +215,16 @@ function pos() {
 
                     <div class="flex flex-wrap gap-3 text-sm">
                         <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2">
-                            <input type="radio" value="existing" x-model="rx_mode" name="rx_mode" class="text-emerald-500 focus:ring-emerald-500/30"> Pakai resep tersimpan
+                            <input type="radio" value="existing" x-model="rx_mode" name="rx_mode" class="text-red-500 focus:ring-red-500/30"> Pakai resep tersimpan
                         </label>
                         <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2">
-                            <input type="radio" value="new" x-model="rx_mode" name="rx_mode" class="text-emerald-500 focus:ring-emerald-500/30"> Input resep baru
+                            <input type="radio" value="new" x-model="rx_mode" name="rx_mode" class="text-red-500 focus:ring-red-500/30"> Input resep baru
                         </label>
                     </div>
 
                     <div x-show="rx_mode === 'existing'" class="mt-4">
                         <template x-if="custRx().length">
-                            <select name="prescription_id" x-model="prescription_id" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                            <select name="prescription_id" x-model="prescription_id" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                                 <option value="">— Pilih resep —</option>
                                 <template x-for="r in custRx()" :key="r.id">
                                     <option :value="r.id" x-text="r.doctor + ' · ' + r.date"></option>
@@ -240,11 +240,11 @@ function pos() {
                         <div class="grid gap-4 sm:grid-cols-3">
                             <input type="hidden" name="new_prescription" value="1" :disabled="rx_mode !== 'new'">
                             <input name="prescription[doctor_or_optician]" placeholder="Dokter / Optometris *"
-                                   class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                                   class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                             <input name="prescription[examination_date]" type="date" value="{{ now()->toDateString() }}"
-                                   class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                                   class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                             <input name="prescription[prescription_type]" placeholder="Tipe resep"
-                                   class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                                   class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                         </div>
                         <div class="grid gap-4 sm:grid-cols-2">
                             @foreach (['od' => 'OD Kanan', 'os' => 'OS Kiri'] as $eye => $label)
@@ -253,13 +253,13 @@ function pos() {
                                     <div class="grid grid-cols-3 gap-2">
                                         @foreach (['sph', 'cyl', 'axis', 'add', 'pd'] as $k)
                                             <input name="prescription[{{ $eye }}_{{ $k }}]" placeholder="{{ strtoupper($k) }}"
-                                                   class="rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-emerald-500 focus:outline-none">
+                                                   class="rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-red-500 focus:outline-none">
                                         @endforeach
                                     </div>
                                 </div>
                             @endforeach
                         </div>
-                        <textarea name="prescription[notes]" rows="2" placeholder="Catatan resep" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"></textarea>
+                        <textarea name="prescription[notes]" rows="2" placeholder="Catatan resep" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none"></textarea>
                     </div>
                 </section>
             </div>
@@ -310,7 +310,7 @@ function pos() {
                     <!-- Step 5: promo -->
                     <div class="mt-5 border-t border-slate-100 pt-4">
                         <p class="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">5 · Promo</p>
-                        <select name="promo_id" x-model="promo_id" class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                        <select name="promo_id" x-model="promo_id" class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                             <option value="">Tanpa promo</option>
                             @foreach ($promotions as $p)
                                 <option value="{{ $p->id }}">{{ $p->name }}</option>
@@ -334,7 +334,7 @@ function pos() {
                                 @foreach (['cash' => 'Cash', 'transfer' => 'Transfer', 'qris' => 'QRIS', 'card' => 'Kartu'] as $value => $label)
                                     <label class="cursor-pointer">
                                         <input type="radio" name="payment_method" value="{{ $value }}" x-model="payment_method" class="peer sr-only">
-                                        <span class="block rounded-lg border border-slate-200 py-2 text-center text-xs font-semibold text-slate-600 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-700">{{ $label }}</span>
+                                        <span class="block rounded-lg border border-slate-200 py-2 text-center text-xs font-semibold text-slate-600 peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:text-red-700">{{ $label }}</span>
                                     </label>
                                 @endforeach
                             </div>
@@ -345,23 +345,23 @@ function pos() {
                             <div class="grid grid-cols-2 gap-2">
                                 <label class="cursor-pointer">
                                     <input type="radio" name="payment_status" value="paid" x-model="payment_status" class="peer sr-only">
-                                    <span class="block rounded-lg border border-slate-200 py-2 text-center text-xs font-semibold text-slate-600 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-700">Lunas</span>
+                                    <span class="block rounded-lg border border-slate-200 py-2 text-center text-xs font-semibold text-slate-600 peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:text-red-700">Lunas</span>
                                 </label>
                                 <label class="cursor-pointer">
                                     <input type="radio" name="payment_status" value="down_payment" x-model="payment_status" class="peer sr-only">
-                                    <span class="block rounded-lg border border-slate-200 py-2 text-center text-xs font-semibold text-slate-600 peer-checked:border-emerald-500 peer-checked:bg-emerald-50 peer-checked:text-emerald-700">DP</span>
+                                    <span class="block rounded-lg border border-slate-200 py-2 text-center text-xs font-semibold text-slate-600 peer-checked:border-red-500 peer-checked:bg-red-50 peer-checked:text-red-700">DP</span>
                                 </label>
                             </div>
                             <div x-show="payment_status === 'down_payment'" x-cloak class="mt-3">
                                 <input name="dp_amount" type="number" min="1" step="1" x-model="dp_amount" placeholder="Nominal DP"
-                                       class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                                       class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                                 <p class="mt-1 text-xs text-slate-500">Dibayar sekarang: <span class="font-semibold" x-text="fmt(payNow)"></span></p>
                             </div>
                         </div>
 
                         <div>
                             <p class="mb-2 text-xs font-bold uppercase tracking-wider text-slate-500">Status Pesanan</p>
-                            <select name="status" x-model="status" class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                            <select name="status" x-model="status" class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                                 @foreach (['ordered' => 'Ordered (Dipesan)', 'processing' => 'Processing (Diproses)', 'ready' => 'Ready (Siap Diambil)', 'completed' => 'Completed (Selesai)'] as $value => $label)
                                     <option value="{{ $value }}">{{ $label }}</option>
                                 @endforeach
@@ -370,10 +370,10 @@ function pos() {
 
                         <div>
                             <textarea name="notes" x-model="notes" rows="2" placeholder="Catatan transaksi (opsional)"
-                                      class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none"></textarea>
+                                      class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none"></textarea>
                         </div>
 
-                        <button type="submit" class="w-full rounded-xl bg-emerald-500 py-3.5 text-sm font-extrabold text-white transition hover:bg-emerald-600">
+                        <button type="submit" class="w-full rounded-xl bg-red-600 py-3.5 text-sm font-extrabold text-white transition hover:bg-red-700">
                             Simpan Transaksi
                         </button>
                     </div>

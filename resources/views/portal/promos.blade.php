@@ -8,10 +8,10 @@
     <div class="space-y-4">
         @forelse ($promotions as $promo)
             <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                <div class="bg-gradient-to-r from-slate-900 to-emerald-900 px-5 py-4 text-white">
+                <div class="bg-gradient-to-r from-slate-900 to-red-900 px-5 py-4 text-white">
                     <div class="flex items-center justify-between">
                         <div>
-                            <p class="text-[10px] uppercase tracking-[0.2em] text-emerald-400">{{ str_replace('_', ' ', $promo->promo_type) }}</p>
+                            <p class="text-[10px] uppercase tracking-[0.2em] text-red-400">{{ str_replace('_', ' ', $promo->promo_type) }}</p>
                             <p class="mt-1 text-base font-extrabold">{{ $promo->name }}</p>
                         </div>
                         <span class="rounded-xl bg-white px-3 py-1.5 text-sm font-extrabold text-slate-900">

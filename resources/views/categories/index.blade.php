@@ -14,22 +14,22 @@
                 <div>
                     <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Nama *</label>
                     <input name="name" required value="{{ old('name', $category?->name) }}"
-                           class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                           class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20">
                 </div>
                 <div>
                     <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Tipe *</label>
-                    <select name="type" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none">
+                    <select name="type" class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                         @foreach (['lens' => 'Lensa', 'frame' => 'Frame', 'accessory' => 'Aksesoris'] as $value => $label)
                             <option value="{{ $value }}" @selected(old('type', $category?->type) === $value)>{{ $label }}</option>
                         @endforeach
                     </select>
                 </div>
                 <label class="flex items-center gap-2 text-sm text-slate-600">
-                    <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $category?->is_active ?? true)) class="h-4 w-4 rounded border-slate-300 text-emerald-500 focus:ring-emerald-500/30">
+                    <input type="checkbox" name="is_active" value="1" @checked(old('is_active', $category?->is_active ?? true)) class="h-4 w-4 rounded border-slate-300 text-red-500 focus:ring-red-500/30">
                     Aktif
                 </label>
                 <div class="flex gap-2">
-                    <button class="rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-bold text-white hover:bg-emerald-600">Simpan</button>
+                    <button class="rounded-xl bg-red-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-red-700">Simpan</button>
                     @if ($category)
                         <a href="{{ route('categories.index') }}" class="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600">Batal</a>
                     @endif
@@ -62,7 +62,7 @@
                                 <td class="px-5 py-3 capitalize text-slate-600">{{ $cat->type }}</td>
                                 <td class="px-5 py-3 text-center text-slate-600">{{ $cat->lenses_count }}</td>
                                 <td class="px-5 py-3">
-                                    <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $cat->is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500' }}">
+                                    <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $cat->is_active ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500' }}">
                                         {{ $cat->is_active ? 'AKTIF' : 'NONAKTIF' }}
                                     </span>
                                 </td>

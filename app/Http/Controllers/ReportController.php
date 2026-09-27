@@ -18,7 +18,7 @@ class ReportController extends Controller
             'rows' => $this->query($request)->paginate(15)->withQueryString(),
             'summary' => $this->summary($this->query($request)->get()),
             'staff' => User::whereIn('role', ['admin', 'staff'])->orderBy('name')->get(),
-            'filters' => $request->only(['from', 'to', 'staff_id', 'payment_status']),
+            'filters' => $request->only(['from', 'to', 'staff_id', 'payment_status', 'item_type']),
         ]);
     }
 
@@ -61,6 +61,10 @@ class ReportController extends Controller
             ->when($request->filled('to'), fn ($q) => $q->whereDate('transaction_date', '<=', $request->date('to')))
             ->when($request->filled('staff_id'), fn ($q) => $q->where('staff_id', $request->integer('staff_id')))
             ->when($request->filled('payment_status'), fn ($q) => $q->where('payment_status', $request->string('payment_status')))
+            ->when($request->filled('item_type'), fn ($q) => $q->whereHas(
+                'items',
+                fn ($item) => $item->where('item_type', $request->string('item_type')),
+            ))
             ->whereNotIn('status', ['cancelled', 'refunded'])
             ->orderBy('transaction_date');
     }

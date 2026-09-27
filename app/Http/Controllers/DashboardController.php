@@ -6,6 +6,7 @@ use App\Models\Customer;
 use App\Models\Frame;
 use App\Models\Lens;
 use App\Models\Transaction;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
@@ -45,7 +46,58 @@ class DashboardController extends Controller
                 ->latest('transaction_date')
                 ->limit(8)
                 ->get(),
+            'dailyTrend' => $this->dailyTrend($billable),
+            'monthlyTrend' => $this->monthlyTrend($billable),
         ]);
+    }
+
+    /**
+     * Sales per day for the last 14 days.
+     *
+     * @param  \Closure(): Builder<Transaction>  $billable
+     * @return Collection<int, array{label: string, value: float}>
+     */
+    private function dailyTrend(\Closure $billable): Collection
+    {
+        $totals = $billable()
+            ->where('transaction_date', '>=', now()->subDays(13)->startOfDay())
+            ->selectRaw('date(transaction_date) as day, SUM(total_amount) as total')
+            ->groupBy('day')
+            ->pluck('total', 'day');
+
+        return collect(range(13, 0))->map(function (int $offset) use ($totals) {
+            $date = now()->subDays($offset);
+
+            return [
+                'label' => $date->format('d/m'),
+                'value' => (float) ($totals[$date->toDateString()] ?? 0),
+            ];
+        })->values();
+    }
+
+    /**
+     * Sales per month for the last 6 months.
+     *
+     * @param  \Closure(): Builder<Transaction>  $billable
+     * @return Collection<int, array{label: string, value: float}>
+     */
+    private function monthlyTrend(\Closure $billable): Collection
+    {
+        $totals = $billable()
+            ->where('transaction_date', '>=', now()->subMonths(5)->startOfMonth())
+            ->selectRaw('date(transaction_date) as day, SUM(total_amount) as total')
+            ->groupBy('day')
+            ->pluck('total', 'day')
+            ->groupBy(fn ($value, string $day) => substr($day, 0, 7));
+
+        return collect(range(5, 0))->map(function (int $offset) use ($totals) {
+            $month = now()->subMonths($offset);
+
+            return [
+                'label' => $month->format('M y'),
+                'value' => (float) ($totals->get($month->format('Y-m'))?->sum() ?? 0),
+            ];
+        })->values();
     }
 
     /**

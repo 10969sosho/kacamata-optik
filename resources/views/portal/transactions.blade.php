@@ -31,8 +31,8 @@
                         @foreach ($steps as $key => $label)
                             @php($done = array_search($key, array_keys($steps), true) <= $current)
                             <div class="flex flex-1 flex-col items-center gap-1">
-                                <span class="h-1.5 w-full rounded {{ $done ? 'bg-emerald-500' : 'bg-slate-200' }}"></span>
-                                <span class="text-[9px] font-semibold {{ $done ? 'text-emerald-600' : 'text-slate-400' }}">{{ $label }}</span>
+                                <span class="h-1.5 w-full rounded {{ $done ? 'bg-red-600' : 'bg-slate-200' }}"></span>
+                                <span class="text-[9px] font-semibold {{ $done ? 'text-red-600' : 'text-slate-400' }}">{{ $label }}</span>
                             </div>
                         @endforeach
                     </div>
@@ -41,7 +41,7 @@
                 @endif
 
                 <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
-                    <span class="rounded-full {{ $trx->payment_status === 'paid' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }} px-2.5 py-1 font-bold uppercase">
+                    <span class="rounded-full {{ $trx->payment_status === 'paid' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }} px-2.5 py-1 font-bold uppercase">
                         {{ $trx->payment_status === 'paid' ? 'Lunas' : 'DP' }}
                     </span>
                     <span class="text-slate-500 capitalize">{{ str_replace('_', ' ', $trx->payment_method) }}</span>

@@ -20,9 +20,7 @@
     <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div class="mx-auto flex h-14 max-w-lg items-center justify-between px-4">
             <div class="flex items-center gap-2">
-                <span class="grid h-8 w-8 place-items-center rounded-lg bg-slate-900 text-emerald-400">
-                    <i data-lucide="glasses" class="h-4 w-4"></i>
-                </span>
+                <img src="{{ asset('images/logo.svg') }}" alt="Optik" class="h-8 w-8 shrink-0 rounded-lg">
                 <div>
                     <p class="text-sm font-extrabold leading-none text-slate-900">KARTU MEMBER</p>
                     <p class="text-[10px] text-slate-500">{{ auth()->user()?->customer?->member_id ?? 'Member' }}</p>
@@ -56,7 +54,7 @@
             @foreach ($navItems as $nav)
                 @php($active = request()->routeIs($nav['route']))
                 <a href="{{ route($nav['route']) }}"
-                   class="flex flex-col items-center gap-1 py-3 text-[11px] font-semibold {{ $active ? 'text-emerald-600' : 'text-slate-400' }}">
+                   class="flex flex-col items-center gap-1 py-3 text-[11px] font-semibold {{ $active ? 'text-red-600' : 'text-slate-400' }}">
                     <i data-lucide="{{ $nav['icon'] }}" class="h-5 w-5"></i>
                     {{ $nav['label'] }}
                 </a>

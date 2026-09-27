@@ -42,6 +42,23 @@ class PrescriptionController extends Controller
             ->with('success', 'Resep kacamata berhasil disimpan.');
     }
 
+    public function edit(Prescription $prescription): View
+    {
+        return view('prescriptions.form', [
+            'customers' => Customer::orderBy('name')->get(),
+            'presetCustomer' => $prescription->customer,
+            'prescription' => $prescription,
+        ]);
+    }
+
+    public function update(Request $request, Prescription $prescription): RedirectResponse
+    {
+        $prescription->update($this->validated($request));
+
+        return redirect()->route('prescriptions.show', $prescription)
+            ->with('success', 'Resep kacamata berhasil diperbarui.');
+    }
+
     public function show(Prescription $prescription): View
     {
         return view('prescriptions.show', ['prescription' => $prescription->load('customer')]);
@@ -52,7 +69,7 @@ class PrescriptionController extends Controller
      */
     private function validated(Request $request): array
     {
-        return $request->validate([
+        $data = $request->validate([
             'customer_id' => ['required', 'exists:customers,id'],
             'doctor_or_optician' => ['required', 'string', 'max:120'],
             'examination_date' => ['required', 'date'],
@@ -71,5 +88,9 @@ class PrescriptionController extends Controller
             'fitting_height' => ['nullable', 'string', 'max:10'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
+
+        $data['prescription_type'] = ! empty($data['prescription_type']) ? $data['prescription_type'] : 'Distance';
+
+        return $data;
     }
 }

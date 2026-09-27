@@ -108,6 +108,7 @@ class PosController extends Controller
                 ])['prescription'];
 
                 $inline['customer_id'] = (int) $data['customer_id'];
+                $inline['prescription_type'] = ! empty($inline['prescription_type']) ? $inline['prescription_type'] : 'Distance';
                 $prescriptionId = Prescription::create($inline)->id;
             }
 
