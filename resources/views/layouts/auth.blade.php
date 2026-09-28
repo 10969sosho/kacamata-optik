@@ -22,7 +22,7 @@
         <div class="absolute -right-16 bottom-0 h-80 w-80 rounded-full bg-red-500/30 blur-3xl"></div>
         <div class="relative flex h-full flex-col justify-between p-12">
             <div class="flex items-center gap-3">
-                <img src="{{ asset('images/logo.svg') }}" alt="Optik ERP" class="h-10 w-10 rounded-xl">
+                <img src="{{ asset('images/logo.jpg') }}" alt="Optik ERP" class="h-10 w-10 rounded-xl">
                 <span class="text-lg font-extrabold tracking-wide text-white">OPTIK ERP</span>
             </div>
             <div class="max-w-md">
@@ -36,7 +36,7 @@
     <div class="flex flex-1 items-center justify-center px-4 py-10 sm:px-8">
         <div class="w-full max-w-md">
             <div class="mb-8 flex items-center gap-3 lg:hidden">
-                <img src="{{ asset('images/logo.svg') }}" alt="Optik ERP" class="h-10 w-10 rounded-xl">
+                <img src="{{ asset('images/logo.jpg') }}" alt="Optik ERP" class="h-10 w-10 rounded-xl">
                 <span class="text-lg font-extrabold tracking-wide text-slate-900">OPTIK ERP</span>
             </div>
 

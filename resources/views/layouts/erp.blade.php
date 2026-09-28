@@ -34,7 +34,7 @@
     <aside class="fixed inset-y-0 left-0 z-40 w-64 border-r border-slate-200 bg-white text-slate-600 transition-transform duration-200 lg:translate-x-0"
            :class="drawer ? 'translate-x-0' : '-translate-x-full'">
         <div class="flex h-16 items-center gap-3 border-b border-slate-200 px-6">
-            <img src="{{ asset('images/logo.svg') }}" alt="Optik ERP" class="h-9 w-9 shrink-0 rounded-xl">
+            <img src="{{ asset('images/logo.jpg') }}" alt="Optik ERP" class="h-9 w-9 shrink-0 rounded-xl">
             <div>
                 <p class="text-sm font-extrabold tracking-wide text-slate-900">OPTIK ERP</p>
                 <p class="text-[11px] text-slate-500">Management Suite</p>

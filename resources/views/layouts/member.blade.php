@@ -20,7 +20,7 @@
     <header class="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div class="mx-auto flex h-14 max-w-lg items-center justify-between px-4">
             <div class="flex items-center gap-2">
-                <img src="{{ asset('images/logo.svg') }}" alt="Optik" class="h-8 w-8 shrink-0 rounded-lg">
+                <img src="{{ asset('images/logo.jpg') }}" alt="Optik" class="h-8 w-8 shrink-0 rounded-lg">
                 <div>
                     <p class="text-sm font-extrabold leading-none text-slate-900">KARTU MEMBER</p>
                     <p class="text-[10px] text-slate-500">{{ auth()->user()?->customer?->member_id ?? 'Member' }}</p>

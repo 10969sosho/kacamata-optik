@@ -20,7 +20,7 @@
 
         <div class="rounded-2xl bg-white p-6 shadow-sm">
             <div class="border-b-2 border-dashed border-slate-300 pb-4 text-center">
-                <img src="{{ asset('images/logo.svg') }}" alt="Logo" class="mx-auto mb-2 h-10 w-10 rounded-xl">
+                <img src="{{ asset('images/logo.jpg') }}" alt="Logo" class="mx-auto mb-2 h-10 w-10 rounded-xl">
                 <p class="text-lg font-extrabold tracking-tight text-slate-900">{{ $transaction->store?->name ?? 'OPTIK' }}</p>
                 <p class="text-xs text-slate-500">{{ $transaction->store?->address ?? '' }}</p>
                 <p class="text-xs text-slate-500">{{ $transaction->store?->phone ?? '' }}</p>

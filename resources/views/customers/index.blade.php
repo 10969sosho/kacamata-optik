@@ -46,7 +46,7 @@
                             <td class="px-5 py-3 text-center text-slate-600">
                                 <p class="font-semibold">{{ $customer->transactions_count }}</p>
                                 <p class="text-[11px] text-slate-400">
-                                    {{ $customer->last_transaction_at ? \Illuminate\Carbon\Carbon::parse($customer->last_transaction_at)->format('d/m/Y') : 'belum ada' }}
+                                    {{ $customer->last_transaction_at ? \Illuminate\Support\Carbon::parse($customer->last_transaction_at)->format('d/m/Y') : 'belum ada' }}
                                 </p>
                             </td>
                             <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($customer->total_spending ?? 0)</td>
