@@ -16,6 +16,7 @@
                     <input id="phone" name="phone" type="tel" required value="{{ old('phone') }}" placeholder="81234567890"
                            class="w-full bg-transparent px-3 py-3 text-sm text-slate-900 placeholder:text-slate-500 focus:outline-none">
                 </div>
+                <p class="mt-1.5 text-xs text-slate-400">Boleh diawali 0, +62, atau 62 — semuanya dianggap nomor yang sama.</p>
                 @error('phone')<p class="mt-1.5 text-xs text-red-600">{{ $message }}</p>@enderror
             </div>
 

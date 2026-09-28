@@ -26,10 +26,14 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
-        $field = filter_var($data['login'], FILTER_VALIDATE_EMAIL) !== false ? 'email' : 'phone';
+        $isEmail = filter_var($data['login'], FILTER_VALIDATE_EMAIL) !== false;
 
         $user = User::query()
-            ->where($field, $data['login'])
+            ->when(
+                $isEmail,
+                fn ($query) => $query->where('email', $data['login']),
+                fn ($query) => $query->whereIn('phone', $this->phoneVariants($data['login'])),
+            )
             ->where('status', 'active')
             ->first();
 
@@ -62,7 +66,7 @@ class AuthController extends Controller
             'phone' => ['required', 'string', 'min:8', 'max:20'],
         ]);
 
-        $phone = preg_replace('/\D+/', '', $data['phone']) ?? '';
+        $phone = $this->normalizePhone($data['phone']);
 
         if (strlen($phone) < 8) {
             throw ValidationException::withMessages(['phone' => 'Nomor WhatsApp tidak valid.']);
@@ -125,7 +129,23 @@ class AuthController extends Controller
 
     private function resolveCustomerUser(string $phone): User
     {
-        $user = User::query()->where('phone', $phone)->where('role', 'customer')->first();
+        $phone = $this->normalizePhone($phone);
+        $variants = $this->phoneVariants($phone);
+
+        $customer = Customer::query()->whereIn('phone', $variants)->first();
+
+        if ($customer?->user_id) {
+            $linked = User::query()->find($customer->user_id);
+
+            if ($linked) {
+                return $linked;
+            }
+        }
+
+        $user = User::query()
+            ->whereIn('phone', $variants)
+            ->where('role', 'customer')
+            ->first();
 
         if (! $user) {
             $user = User::create([
@@ -136,9 +156,6 @@ class AuthController extends Controller
                 'status' => 'active',
             ]);
         }
-
-        $customer = Customer::query()->where('phone', $phone)->first()
-            ?? Customer::query()->where('user_id', $user->id)->first();
 
         if (! $customer) {
             $customer = Customer::create([
@@ -154,5 +171,47 @@ class AuthController extends Controller
         }
 
         return $user;
+    }
+
+    /**
+     * Normalise a WhatsApp number to the local 08xx format used throughout the database.
+     *
+     * The OTP form asks for 81234567890 (the +62 prefix is rendered next to the input)
+     * while customers are stored as 081234567890, so both, plus 6281234567890, must
+     * resolve to the same member record instead of spawning an empty duplicate account.
+     */
+    private function normalizePhone(string $phone): string
+    {
+        $digits = preg_replace('/\D+/', '', $phone) ?? '';
+
+        if (str_starts_with($digits, '62') && strlen($digits) > 10) {
+            $digits = '0'.substr($digits, 2);
+        }
+
+        if (str_starts_with($digits, '8')) {
+            $digits = '0'.$digits;
+        }
+
+        return $digits;
+    }
+
+    /**
+     * Every written form of a number so rows saved before normalisation still match.
+     *
+     * @return list<string>
+     */
+    private function phoneVariants(string $phone): array
+    {
+        $local = $this->normalizePhone($phone);
+
+        if ($local === '') {
+            return [trim($phone)];
+        }
+
+        return array_values(array_unique([
+            $local,
+            ltrim($local, '0'),
+            '62'.substr($local, 1),
+        ]));
     }
 }

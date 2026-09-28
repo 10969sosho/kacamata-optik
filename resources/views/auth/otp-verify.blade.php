@@ -6,7 +6,7 @@
     <div class="rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
         <h2 class="text-2xl font-extrabold text-slate-900">Verifikasi Kode</h2>
         <p class="mt-1 text-sm text-slate-500">
-            Kode 6 digit dikirim ke <span class="font-semibold text-slate-900">+62{{ session('otp_phone') }}</span>.
+            Kode 6 digit dikirim ke <span class="font-semibold text-slate-900">{{ session('otp_phone') }}</span>.
         </p>
 
         @if (session('otp_demo'))

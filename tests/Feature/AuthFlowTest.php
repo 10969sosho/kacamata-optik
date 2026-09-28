@@ -126,6 +126,62 @@ class AuthFlowTest extends TestCase
         $this->assertGuest();
     }
 
+    public function test_otp_login_without_leading_zero_reuses_existing_member(): void
+    {
+        $user = User::create([
+            'name' => 'Budi Santoso',
+            'phone' => '081298765432',
+            'password' => 'password',
+            'role' => 'customer',
+            'status' => 'active',
+        ]);
+
+        Customer::create([
+            'user_id' => $user->id,
+            'member_id' => 'KCM-000012',
+            'name' => 'Budi Santoso',
+            'phone' => '081298765432',
+            'registered_at' => '2025-03-10',
+            'status' => 'active',
+        ]);
+
+        $this->post(route('login.otp.send'), ['phone' => '81298765432']);
+        $this->post(route('login.otp.check'), ['code' => session('otp_demo')])
+            ->assertRedirect(route('portal.index'));
+
+        $this->assertAuthenticatedAs($user);
+        $this->assertSame(1, User::where('phone', '081298765432')->count());
+        $this->assertSame(0, User::where('phone', '81298765432')->count());
+        $this->assertSame(1, Customer::count());
+    }
+
+    public function test_otp_login_with_country_code_reuses_existing_member(): void
+    {
+        $user = User::create([
+            'name' => 'Budi Santoso',
+            'phone' => '081298765432',
+            'password' => 'password',
+            'role' => 'customer',
+            'status' => 'active',
+        ]);
+
+        Customer::create([
+            'user_id' => $user->id,
+            'member_id' => 'KCM-000012',
+            'name' => 'Budi Santoso',
+            'phone' => '081298765432',
+            'registered_at' => '2025-03-10',
+            'status' => 'active',
+        ]);
+
+        $this->post(route('login.otp.send'), ['phone' => '6281298765432']);
+        $this->post(route('login.otp.check'), ['code' => session('otp_demo')])
+            ->assertRedirect(route('portal.index'));
+
+        $this->assertAuthenticatedAs($user);
+        $this->assertSame(1, Customer::count());
+    }
+
     public function test_verify_page_redirects_when_no_otp_session(): void
     {
         $this->get(route('login.otp.verify'))->assertRedirect(route('login.otp'));
