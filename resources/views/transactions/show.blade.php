@@ -7,6 +7,28 @@
     @php
         $steps = ['ordered' => 'Dipesan', 'processing' => 'Diproses', 'ready' => 'Siap Diambil', 'completed' => 'Selesai'];
         $current = array_search($transaction->status, array_keys($steps), true);
+
+        $wearerGroups = $transaction->users()->with('prescription')->get()
+            ->map(fn ($user) => [
+                'label' => $user->name,
+                'rx' => $user->prescription,
+                'items' => $transaction->items->where('transaction_user_id', $user->id)->values(),
+            ])
+            ->values();
+
+        $unassigned = $transaction->items->whereNull('transaction_user_id');
+
+        if ($unassigned->isNotEmpty()) {
+            $wearerGroups->push(['label' => 'Umum', 'rx' => $transaction->prescription, 'items' => $unassigned->values()]);
+        }
+
+        if ($wearerGroups->isEmpty()) {
+            $wearerGroups->push([
+                'label' => $transaction->customer?->name ?? 'Umum',
+                'rx' => $transaction->prescription,
+                'items' => $transaction->items,
+            ]);
+        }
     @endphp
 
     <div class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -50,6 +72,7 @@
             <div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
                 <div class="border-b border-slate-100 px-5 py-4">
                     <h2 class="text-sm font-bold text-slate-900">Item Transaksi</h2>
+                    <p class="text-xs text-slate-500">Dipisah per pemakai (user) dalam transaksi ini</p>
                 </div>
                 <table class="w-full text-left text-sm">
                     <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
@@ -60,19 +83,33 @@
                             <th class="px-5 py-3 text-right">Subtotal</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-slate-100">
-                        @foreach ($transaction->items as $item)
-                            <tr>
-                                <td class="px-5 py-3">
-                                    <p class="font-semibold text-slate-900">{{ $item->name }}</p>
-                                    <p class="text-xs uppercase text-slate-400">{{ $item->item_type }}</p>
+                    @foreach ($wearerGroups as $group)
+                        <tbody>
+                            <tr class="bg-red-50/60">
+                                <td colspan="4" class="px-5 py-2.5">
+                                    <p class="text-[11px] font-bold uppercase tracking-wider text-red-700">
+                                        Pemakai: {{ $group['label'] }}
+                                        @if ($group['rx'])
+                                            <a href="{{ route('prescriptions.show', $group['rx']) }}" class="ml-2 font-semibold normal-case text-red-600 underline">lihat resep</a>
+                                        @endif
+                                    </p>
                                 </td>
-                                <td class="px-5 py-3 text-center text-slate-600">{{ $item->quantity }}</td>
-                                <td class="px-5 py-3 text-right text-slate-600">@idr($item->price)</td>
-                                <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($item->subtotal)</td>
                             </tr>
-                        @endforeach
-                    </tbody>
+                            @forelse ($group['items'] as $item)
+                                <tr>
+                                    <td class="px-5 py-3">
+                                        <p class="font-semibold text-slate-900">{{ $item->name }}</p>
+                                        <p class="text-xs uppercase text-slate-400">{{ $item->item_type }}</p>
+                                    </td>
+                                    <td class="px-5 py-3 text-center text-slate-600">{{ $item->quantity }}</td>
+                                    <td class="px-5 py-3 text-right text-slate-600">@idr($item->price)</td>
+                                    <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($item->subtotal)</td>
+                                </tr>
+                            @empty
+                                <tr><td colspan="4" class="px-5 py-3 text-xs text-slate-400">Tidak ada item.</td></tr>
+                            @endforelse
+                        </tbody>
+                    @endforeach
                 </table>
             </div>
 
@@ -97,6 +134,25 @@
         </div>
 
         <div class="space-y-6">
+            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <h2 class="mb-3 text-sm font-bold text-slate-900">Pemakai (User)</h2>
+                <ul class="space-y-2.5">
+                    @forelse ($wearerGroups as $index => $group)
+                        <li class="flex items-start justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
+                            <span class="min-w-0">
+                                <span class="block truncate text-sm font-semibold text-slate-900">{{ $group['label'] }}</span>
+                                <span class="block text-[11px] text-slate-500">{{ $group['items']->count() }} item</span>
+                            </span>
+                            @if ($group['rx'])
+                                <a href="{{ route('prescriptions.show', $group['rx']) }}" class="shrink-0 text-[11px] font-semibold text-red-600 hover:underline">Resep</a>
+                            @endif
+                        </li>
+                    @empty
+                        <li class="text-xs text-slate-400">Tidak ada pemakai tercatat.</li>
+                    @endforelse
+                </ul>
+            </div>
+
             <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 class="mb-4 text-sm font-bold text-slate-900">Ringkasan</h2>
                 <dl class="space-y-2.5 text-sm">

@@ -46,6 +46,11 @@
                     </span>
                     <span class="text-slate-500 capitalize">{{ str_replace('_', ' ', $trx->payment_method) }}</span>
                 </div>
+
+                <a href="{{ route('portal.transactions.show', $trx) }}" class="mt-3 flex items-center justify-between rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800">
+                    <span>Lihat Detail</span>
+                    <i data-lucide="chevron-right" class="h-4 w-4"></i>
+                </a>
             </div>
         @empty
             <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-400">

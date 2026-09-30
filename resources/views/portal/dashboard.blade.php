@@ -43,44 +43,6 @@
         </div>
     </div>
 
-    <!-- Active prescription -->
-    <section class="mt-6">
-        <div class="mb-3 flex items-center justify-between">
-            <h2 class="text-sm font-bold text-slate-900">Resep Aktif</h2>
-            <a href="{{ route('portal.prescriptions') }}" class="text-xs font-semibold text-red-600">Semua resep</a>
-        </div>
-
-        @if ($latestPrescription)
-            <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div class="mb-4 flex items-center justify-between text-xs text-slate-500">
-                    <span>{{ $latestPrescription->doctor_or_optician }}</span>
-                    <span>{{ optional($latestPrescription->examination_date)->format('d M Y') }}</span>
-                </div>
-                <div class="grid grid-cols-2 gap-3">
-                    @foreach (['od' => 'OD (Kanan)', 'os' => 'OS (Kiri)'] as $eye => $label)
-                        <div class="rounded-xl bg-slate-50 p-4">
-                            <p class="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $label }}</p>
-                            <div class="grid grid-cols-2 gap-y-1.5 text-xs">
-                                @foreach (['sph' => 'SPH', 'cyl' => 'CYL', 'axis' => 'AXIS', 'add' => 'ADD'] as $k => $lbl)
-                                    <span class="text-slate-500">{{ $lbl }}</span>
-                                    <span class="text-right font-mono font-bold text-slate-900">{{ $latestPrescription->{$eye.'_'.$k} ?: '—' }}</span>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-                <div class="mt-3 flex justify-between text-xs text-slate-500">
-                    <span>PD Total: <b class="text-slate-800">{{ $latestPrescription->pd_total ?: '-' }} mm</b></span>
-                    <span>Fitting: <b class="text-slate-800">{{ $latestPrescription->fitting_height ?: '-' }}</b></span>
-                </div>
-            </div>
-        @else
-            <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-400">
-                Belum ada resep kacamata.
-            </div>
-        @endif
-    </section>
-
     <!-- Latest order status -->
     <section class="mt-6">
         <div class="mb-3 flex items-center justify-between">
@@ -127,6 +89,10 @@
                     </span>
                     <span class="text-slate-500 capitalize">{{ str_replace('_', ' ', $latestTransaction->payment_method) }}</span>
                 </div>
+
+                <a href="{{ route('portal.transactions.show', $latestTransaction) }}" class="mt-3 block rounded-xl bg-slate-900 px-4 py-2.5 text-center text-xs font-bold text-white hover:bg-slate-800">
+                    Lihat Detail Transaksi
+                </a>
             </div>
         @else
             <div class="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-sm text-slate-400">

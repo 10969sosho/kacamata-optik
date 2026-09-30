@@ -42,17 +42,16 @@
 
     <!-- Bottom navigation -->
     <nav class="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur">
-        <div class="mx-auto grid max-w-lg grid-cols-4">
+        <div class="mx-auto grid max-w-lg grid-cols-3">
             @php
                 $navItems = [
                     ['route' => 'portal.index', 'icon' => 'layout-dashboard', 'label' => 'Dashboard'],
-                    ['route' => 'portal.prescriptions', 'icon' => 'file-heart', 'label' => 'Resep'],
                     ['route' => 'portal.transactions', 'icon' => 'receipt-text', 'label' => 'Transaksi'],
                     ['route' => 'portal.promos', 'icon' => 'badge-percent', 'label' => 'Promo'],
                 ];
             @endphp
             @foreach ($navItems as $nav)
-                @php($active = request()->routeIs($nav['route']))
+                @php($active = request()->routeIs($nav['route'].'*'))
                 <a href="{{ route($nav['route']) }}"
                    class="flex flex-col items-center gap-1 py-3 text-[11px] font-semibold {{ $active ? 'text-red-600' : 'text-slate-400' }}">
                     <i data-lucide="{{ $nav['icon'] }}" class="h-5 w-5"></i>

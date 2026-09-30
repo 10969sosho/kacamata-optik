@@ -2,12 +2,16 @@
 
 namespace Tests\Feature;
 
+use App\Models\Accessory;
 use App\Models\Customer;
 use App\Models\Frame;
 use App\Models\Lens;
 use App\Models\Payment;
+use App\Models\Prescription;
+use App\Models\ProductCategory;
 use App\Models\Promotion;
 use App\Models\Transaction;
+use App\Models\TransactionItem;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -54,7 +58,11 @@ class PosTransactionTest extends TestCase
 
     public function test_pos_page_renders(): void
     {
-        $this->actingAs($this->staff)->get(route('pos.create'))->assertOk()->assertSee('Keranjang');
+        $this->actingAs($this->staff)->get(route('pos.create'))
+            ->assertOk()
+            ->assertSee('Keranjang')
+            ->assertSee('Pemakai')
+            ->assertSee('Tambah Pemakai');
     }
 
     public function test_pos_creates_transaction_items_payment_and_decrements_stock(): void
@@ -192,6 +200,147 @@ class PosTransactionTest extends TestCase
 
         $response->assertCreated()->assertJsonStructure(['id', 'name', 'member_id']);
         $this->assertDatabaseHas('customers', ['phone' => '081777777777']);
+    }
+
+    public function test_pos_creates_one_transaction_for_multiple_wearers(): void
+    {
+        $savedRx = Prescription::create([
+            'customer_id' => $this->customer->id,
+            'doctor_or_optician' => 'Dr. Existing',
+            'examination_date' => now()->subDay()->toDateString(),
+            'od_sph' => '-1.00',
+        ]);
+
+        $this->actingAs($this->staff)->post(route('pos.store'), [
+            'customer_id' => $this->customer->id,
+            'users' => [
+                ['name' => 'Adi', 'items' => [['type' => 'frame', 'id' => $this->frame->id, 'qty' => 1]]],
+                [
+                    'name' => 'Anak 1',
+                    'items' => [
+                        ['type' => 'frame', 'id' => $this->frame->id, 'qty' => 1],
+                        ['type' => 'lens', 'id' => $this->lens->id, 'qty' => 2],
+                    ],
+                    'new_prescription' => 1,
+                    'prescription' => [
+                        'doctor_or_optician' => 'Dr. Robert Sp.M',
+                        'examination_date' => now()->toDateString(),
+                        'od_sph' => '-1.50',
+                        'os_sph' => '-1.25',
+                    ],
+                ],
+                [
+                    'name' => 'Anak 2',
+                    'items' => [['type' => 'lens', 'id' => $this->lens->id, 'qty' => 1]],
+                    'prescription_id' => $savedRx->id,
+                ],
+            ],
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'status' => 'processing',
+        ])->assertRedirect();
+
+        $transaction = Transaction::latest('id')->firstOrFail();
+
+        $this->assertSame(1, Transaction::count());
+        $this->assertSame(['Adi', 'Anak 1', 'Anak 2'], $transaction->users()->pluck('name')->all());
+
+        $this->assertSame(9500000.0, (float) $transaction->subtotal);
+        $this->assertSame(9500000.0, (float) $transaction->total_amount);
+        $this->assertSame(3, $this->frame->fresh()->stock);
+        $this->assertSame(7, $this->lens->fresh()->stock);
+
+        $adi = $transaction->users()->where('name', 'Adi')->firstOrFail();
+        $this->assertNull($adi->prescription_id);
+        $this->assertSame(1, $adi->items()->count());
+
+        $childOne = $transaction->users()->where('name', 'Anak 1')->firstOrFail();
+        $this->assertNotNull($childOne->prescription_id);
+        $this->assertSame('Dr. Robert Sp.M', $childOne->prescription->doctor_or_optician);
+        $this->assertSame($this->customer->id, $childOne->prescription->customer_id);
+        $this->assertSame(2, $childOne->items()->count());
+
+        $childTwo = $transaction->users()->where('name', 'Anak 2')->firstOrFail();
+        $this->assertSame($savedRx->id, $childTwo->prescription_id);
+        $this->assertSame('lens', $childTwo->items()->first()->item_type);
+
+        $this->assertSame(4, TransactionItem::where('transaction_id', $transaction->id)->whereNotNull('transaction_user_id')->count());
+        $this->assertSame(4, TransactionItem::where('transaction_id', $transaction->id)->count());
+        $this->assertSame(1, Payment::where('transaction_id', $transaction->id)->count());
+
+        $this->actingAs($this->staff)->get(route('transactions.show', $transaction))
+            ->assertOk()
+            ->assertSee('Anak 1')
+            ->assertSee('Pemakai');
+
+        $this->actingAs($this->staff)->get(route('transactions.print', $transaction))
+            ->assertOk()
+            ->assertSee('Anak 2');
+    }
+
+    public function test_pos_requires_prescription_for_wearer_who_picks_lens(): void
+    {
+        $this->actingAs($this->staff)->post(route('pos.store'), [
+            'customer_id' => $this->customer->id,
+            'users' => [
+                ['name' => 'Adi', 'items' => [['type' => 'lens', 'id' => $this->lens->id, 'qty' => 1]]],
+            ],
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'status' => 'ordered',
+        ])->assertSessionHasErrors('users.0.prescription_id');
+
+        $this->assertSame(0, Transaction::count());
+        $this->assertSame(10, $this->lens->fresh()->stock);
+    }
+
+    public function test_pos_rejects_wearer_without_name_or_items(): void
+    {
+        $this->actingAs($this->staff)->post(route('pos.store'), [
+            'customer_id' => $this->customer->id,
+            'users' => [
+                ['name' => '', 'items' => [['type' => 'frame', 'id' => $this->frame->id, 'qty' => 1]]],
+            ],
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'status' => 'ordered',
+        ])->assertSessionHasErrors('users.0.name');
+
+        $this->actingAs($this->staff)->post(route('pos.store'), [
+            'customer_id' => $this->customer->id,
+            'users' => [['name' => 'Adi', 'items' => []]],
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'status' => 'ordered',
+        ])->assertSessionHasErrors('users.0.items');
+
+        $this->assertSame(0, Transaction::count());
+    }
+
+    public function test_pos_can_sell_accessory_item(): void
+    {
+        $category = ProductCategory::create(['name' => 'Softlens', 'slug' => 'softlens', 'type' => 'accessory', 'is_active' => true]);
+        $accessory = Accessory::create([
+            'sku' => 'SL-001', 'name' => 'Acuvue Moist Daily', 'brand' => 'Acuvue',
+            'category_id' => $category->id, 'buy_price' => 120000, 'sell_price' => 225000,
+            'stock' => 20, 'min_stock' => 5, 'status' => 'active',
+        ]);
+
+        $this->actingAs($this->staff)->post(route('pos.store'), [
+            'customer_id' => $this->customer->id,
+            'users' => [
+                ['name' => 'Adi', 'items' => [['type' => 'accessory', 'id' => $accessory->id, 'qty' => 2]]],
+            ],
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'status' => 'completed',
+        ])->assertRedirect();
+
+        $transaction = Transaction::latest('id')->firstOrFail();
+
+        $this->assertSame(450000.0, (float) $transaction->total_amount);
+        $this->assertSame(18, $accessory->fresh()->stock);
+        $this->assertSame($accessory->id, $transaction->items()->first()->accessory_id);
     }
 
     public function test_transaction_status_can_be_updated(): void

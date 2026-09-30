@@ -5,6 +5,7 @@ use App\Http\Controllers\CategoryController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FrameController;
+use App\Http\Controllers\ItemController;
 use App\Http\Controllers\LensController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\PosController;
@@ -80,6 +81,13 @@ Route::middleware(['auth', 'role:admin,staff'])->group(function () {
 |--------------------------------------------------------------------------
 */
 Route::middleware(['auth', 'role:admin'])->group(function () {
+    Route::get('/items', [ItemController::class, 'index'])->name('items.index');
+    Route::get('/items/accessories/create', [ItemController::class, 'createAccessory'])->name('items.accessories.create');
+    Route::post('/items/accessories', [ItemController::class, 'storeAccessory'])->name('items.accessories.store');
+    Route::get('/items/accessories/{accessory}/edit', [ItemController::class, 'editAccessory'])->name('items.accessories.edit');
+    Route::put('/items/accessories/{accessory}', [ItemController::class, 'updateAccessory'])->name('items.accessories.update');
+    Route::delete('/items/accessories/{accessory}', [ItemController::class, 'destroyAccessory'])->name('items.accessories.destroy');
+
     Route::resource('frames', FrameController::class)->except(['show']);
     Route::resource('lenses', LensController::class)->except(['show']);
 
@@ -101,7 +109,7 @@ Route::middleware(['auth', 'role:admin'])->group(function () {
 */
 Route::middleware(['auth', 'role:customer'])->prefix('portal')->name('portal.')->group(function () {
     Route::get('/', [PortalController::class, 'dashboard'])->name('index');
-    Route::get('/prescriptions', [PortalController::class, 'prescriptions'])->name('prescriptions');
     Route::get('/transactions', [PortalController::class, 'transactions'])->name('transactions');
+    Route::get('/transactions/{transaction}', [PortalController::class, 'transactionShow'])->name('transactions.show');
     Route::get('/promos', [PortalController::class, 'promos'])->name('promos');
 });

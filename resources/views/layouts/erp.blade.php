@@ -45,9 +45,11 @@
             @php
                 $isAdmin = auth()->user()?->isAdmin();
                 $group = fn (string $label) => '<p class="px-3 mb-2 text-[10px] font-bold uppercase tracking-[0.15em] text-slate-400">'.$label.'</p>';
-                $item = function (string $route, string $icon, string $label) {
-                    $active = str_starts_with(request()->route()?->getName() ?? '', explode('.', $route)[0].'.')
-                        || request()->routeIs($route);
+                $item = function (string $route, string $icon, string $label, array $alsoActiveFor = []) {
+                    $active = collect([$route, ...$alsoActiveFor])->contains(fn (string $target) =>
+                        str_starts_with(request()->route()?->getName() ?? '', explode('.', $target)[0].'.')
+                        || request()->routeIs($target)
+                    );
                     return '<a href="'.route($route).'" class="flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition '.($active ? 'bg-red-50 text-red-600 font-bold' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900').'">
                         <i data-lucide="'.$icon.'" class="h-4 w-4 '.($active ? 'text-red-600' : 'text-slate-400').'"></i>
                         <span>'.$label.'</span>
@@ -64,10 +66,8 @@
             @endif
 
             @if ($isAdmin)
-                {!! $group('Master Produk') !!}
-                {!! $item('frames.index', 'glasses', 'Frame') !!}
-                {!! $item('lenses.index', 'scan-eye', 'Lensa') !!}
-                {!! $item('categories.index', 'tags', 'Kategori') !!}
+                {!! $group('Master') !!}
+                {!! $item('items.index', 'package', 'Master Item', ['frames.index', 'lenses.index', 'categories.index']) !!}
                 {!! $group('Lainnya') !!}
                 {!! $item('promotions.index', 'badge-percent', 'Promo') !!}
                 {!! $item('reports.index', 'bar-chart-3', 'Sales Report') !!}

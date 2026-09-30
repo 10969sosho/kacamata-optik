@@ -51,8 +51,8 @@ class CategoryController extends Controller
 
     public function destroy(ProductCategory $category): RedirectResponse
     {
-        if ($category->lenses()->exists()) {
-            return back()->withErrors(['category' => 'Kategori masih dipakai lensa.']);
+        if ($category->lenses()->exists() || $category->accessories()->exists()) {
+            return back()->withErrors(['category' => 'Kategori masih dipakai item.']);
         }
 
         $category->delete();

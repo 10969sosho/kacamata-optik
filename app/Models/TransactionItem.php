@@ -10,9 +10,11 @@ class TransactionItem extends Model
     /** @var list<string> */
     protected $fillable = [
         'transaction_id',
+        'transaction_user_id',
         'item_type',
         'frame_id',
         'lens_id',
+        'accessory_id',
         'name',
         'quantity',
         'price',
@@ -33,6 +35,14 @@ class TransactionItem extends Model
         return $this->belongsTo(Transaction::class);
     }
 
+    /**
+     * Pemakai (user) yang memakai item ini.
+     */
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(TransactionUser::class, 'transaction_user_id');
+    }
+
     public function frame(): BelongsTo
     {
         return $this->belongsTo(Frame::class);
@@ -41,5 +51,10 @@ class TransactionItem extends Model
     public function lens(): BelongsTo
     {
         return $this->belongsTo(Lens::class);
+    }
+
+    public function accessory(): BelongsTo
+    {
+        return $this->belongsTo(Accessory::class);
     }
 }

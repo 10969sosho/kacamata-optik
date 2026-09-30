@@ -71,6 +71,16 @@ class Transaction extends Model
         return $this->hasMany(Payment::class);
     }
 
+    /**
+     * Pemakai (user) yang itemnya tercatat pada transaksi ini.
+     *
+     * @return HasMany<TransactionUser, $this>
+     */
+    public function users(): HasMany
+    {
+        return $this->hasMany(TransactionUser::class);
+    }
+
     public function isPaid(): bool
     {
         return $this->payment_status === 'paid';

@@ -36,6 +36,25 @@
                 @endif
             </div>
 
+            @php
+                $printGroups = $transaction->users()->get()
+                    ->map(fn ($user) => [
+                        'label' => $user->name,
+                        'items' => $transaction->items->where('transaction_user_id', $user->id)->values(),
+                    ])
+                    ->values();
+
+                $printUnassigned = $transaction->items->whereNull('transaction_user_id');
+
+                if ($printUnassigned->isNotEmpty()) {
+                    $printGroups->push(['label' => 'Umum', 'items' => $printUnassigned->values()]);
+                }
+
+                if ($printGroups->isEmpty()) {
+                    $printGroups->push(['label' => $transaction->customer?->name ?? 'Umum', 'items' => $transaction->items]);
+                }
+            @endphp
+
             <table class="w-full border-b border-dashed border-slate-300 py-2 text-xs">
                 <thead>
                     <tr class="text-left text-slate-500">
@@ -46,18 +65,25 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    @foreach ($transaction->items as $item)
-                        <tr>
-                            <td class="py-2 pr-2">
-                                <p class="font-semibold text-slate-900">{{ $item->name }}</p>
-                                @if ($item->frame?->sku || $item->lens?->sku)
-                                    <p class="text-[10px] text-slate-400">{{ $item->frame?->sku ?? $item->lens?->sku }}</p>
-                                @endif
+                    @foreach ($printGroups as $group)
+                        <tr class="border-t border-slate-200">
+                            <td colspan="4" class="pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                                Pemakai: {{ $group['label'] }}
                             </td>
-                            <td class="py-2 text-center">{{ $item->quantity }}</td>
-                            <td class="py-2 text-right">@idr($item->price)</td>
-                            <td class="py-2 text-right font-semibold">@idr($item->subtotal)</td>
                         </tr>
+                        @foreach ($group['items'] as $item)
+                            <tr>
+                                <td class="py-2 pr-2">
+                                    <p class="font-semibold text-slate-900">{{ $item->name }}</p>
+                                    @if ($item->frame?->sku || $item->lens?->sku || $item->accessory?->sku)
+                                        <p class="text-[10px] text-slate-400">{{ $item->frame?->sku ?? $item->lens?->sku ?? $item->accessory?->sku }}</p>
+                                    @endif
+                                </td>
+                                <td class="py-2 text-center">{{ $item->quantity }}</td>
+                                <td class="py-2 text-right">@idr($item->price)</td>
+                                <td class="py-2 text-right font-semibold">@idr($item->subtotal)</td>
+                            </tr>
+                        @endforeach
                     @endforeach
                 </tbody>
             </table>

@@ -25,4 +25,10 @@ class ProductCategory extends Model
     {
         return $this->hasMany(Lens::class, 'category_id');
     }
+
+    /** @return HasMany<Accessory, $this> */
+    public function accessories(): HasMany
+    {
+        return $this->hasMany(Accessory::class, 'category_id');
+    }
 }

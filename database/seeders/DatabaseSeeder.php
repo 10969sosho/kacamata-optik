@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Accessory;
 use App\Models\Customer;
 use App\Models\Frame;
 use App\Models\Lens;
@@ -12,6 +13,7 @@ use App\Models\Promotion;
 use App\Models\Store;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
+use App\Models\TransactionUser;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -148,6 +150,20 @@ class DatabaseSeeder extends Seeder
         ProductCategory::create([
             'name' => 'Aksesoris',
             'slug' => 'aksesoris',
+            'type' => 'accessory',
+            'is_active' => true,
+        ]);
+
+        ProductCategory::create([
+            'name' => 'Softlens',
+            'slug' => 'softlens',
+            'type' => 'accessory',
+            'is_active' => true,
+        ]);
+
+        ProductCategory::create([
+            'name' => 'Case / Wadah',
+            'slug' => 'case-wadah',
             'type' => 'accessory',
             'is_active' => true,
         ]);
@@ -512,6 +528,139 @@ class DatabaseSeeder extends Seeder
         $this->seedAdditionalPrescriptions();
         $this->seedAdditionalPromotions();
         $this->seedAdditionalTransactions($frames, $lenses, $extraCustomers);
+
+        $this->attachWearer($trx1, $budi->name, $trx1->prescription_id);
+        $this->attachWearer($trx2, $siti->name, $trx2->prescription_id);
+        $this->attachWearer($trx3, $hendra->name);
+
+        $this->seedMultiWearerTransaction($pusat, $staff, $budi, $resepBudi);
+    }
+
+    /**
+     * Pasang pemakai (user) pada transaksi dan tautkan seluruh itemnya.
+     */
+    private function attachWearer(Transaction $transaction, string $name, ?int $prescriptionId = null): void
+    {
+        $wearer = TransactionUser::create([
+            'transaction_id' => $transaction->id,
+            'name' => $name,
+            'prescription_id' => $prescriptionId,
+        ]);
+
+        TransactionItem::where('transaction_id', $transaction->id)
+            ->whereNull('transaction_user_id')
+            ->update(['transaction_user_id' => $wearer->id]);
+    }
+
+    /**
+     * Contoh 1 transaksi / 1 member id dengan beberapa pemakai
+     * (Ayah, Anak 1, Anak 2) — masing-masing item & resep sendiri.
+     */
+    private function seedMultiWearerTransaction(Store $store, User $staff, Customer $customer, ?Prescription $customerPrescription): void
+    {
+        $resepAnak1 = Prescription::create([
+            'customer_id' => $customer->id,
+            'doctor_or_optician' => 'Optometris Dian',
+            'examination_date' => '2026-09-10',
+            'od_sph' => '-2.50',
+            'od_cyl' => '-0.75',
+            'od_axis' => '180',
+            'os_sph' => '-2.25',
+            'os_cyl' => '-0.50',
+            'os_axis' => '175',
+            'pd_total' => '58',
+            'notes' => 'Resep anak pertama.',
+        ]);
+
+        $resepAnak2 = Prescription::create([
+            'customer_id' => $customer->id,
+            'doctor_or_optician' => 'Optometris Dian',
+            'examination_date' => '2026-09-10',
+            'od_sph' => '-1.75',
+            'os_sph' => '-1.50',
+            'pd_total' => '56',
+            'notes' => 'Resep anak kedua.',
+        ]);
+
+        $plan = [
+            ['name' => $customer->name, 'rx' => $customerPrescription?->id, 'items' => [['frame', 'FR-RB-002', 1], ['lens', 'LS-ES-002', 1]]],
+            ['name' => 'Raka (Anak 1)', 'rx' => $resepAnak1->id, 'items' => [['frame', 'FR-KD-001', 1], ['lens', 'LS-HY-001', 1]]],
+            ['name' => 'Rini (Anak 2)', 'rx' => $resepAnak2->id, 'items' => [['lens', 'LS-ES-001', 1]]],
+        ];
+
+        $groups = [];
+        $subtotal = 0.0;
+
+        foreach ($plan as $group) {
+            $lines = [];
+
+            foreach ($group['items'] as [$type, $sku, $qty]) {
+                $product = $type === 'frame'
+                    ? Frame::query()->where('sku', $sku)->first()
+                    : Lens::query()->where('sku', $sku)->first();
+
+                if (! $product) {
+                    continue;
+                }
+
+                $price = (float) $product->sell_price;
+                $subtotal += $price * $qty;
+                $lines[] = ['type' => $type, 'product' => $product, 'qty' => $qty, 'price' => $price];
+            }
+
+            $groups[] = ['name' => $group['name'], 'rx' => $group['rx'], 'lines' => $lines];
+        }
+
+        if ($subtotal <= 0) {
+            return;
+        }
+
+        $transaction = Transaction::create([
+            'invoice_number' => 'TRX-'.now()->format('Ymd').'-00200',
+            'store_id' => $store->id,
+            'staff_id' => $staff->id,
+            'customer_id' => $customer->id,
+            'prescription_id' => $customerPrescription?->id,
+            'subtotal' => $subtotal,
+            'discount_amount' => 0,
+            'total_amount' => $subtotal,
+            'payment_status' => 'down_payment',
+            'payment_method' => 'cash',
+            'status' => 'ordered',
+            'notes' => 'Satu transaksi untuk ayah & dua anaknya.',
+            'transaction_date' => now()->subDay()->setTime(9, 30),
+        ]);
+
+        foreach ($groups as $group) {
+            $wearer = TransactionUser::create([
+                'transaction_id' => $transaction->id,
+                'name' => $group['name'],
+                'prescription_id' => $group['rx'],
+            ]);
+
+            foreach ($group['lines'] as $line) {
+                TransactionItem::create([
+                    'transaction_id' => $transaction->id,
+                    'transaction_user_id' => $wearer->id,
+                    'item_type' => $line['type'],
+                    'frame_id' => $line['type'] === 'frame' ? $line['product']->id : null,
+                    'lens_id' => $line['type'] === 'lens' ? $line['product']->id : null,
+                    'name' => $line['product']->name,
+                    'quantity' => $line['qty'],
+                    'price' => $line['price'],
+                    'discount' => 0,
+                    'subtotal' => $line['price'] * $line['qty'],
+                ]);
+            }
+        }
+
+        Payment::create([
+            'transaction_id' => $transaction->id,
+            'amount' => (int) round($subtotal / 2, -3),
+            'payment_method' => 'cash',
+            'paid_at' => now()->subDay()->setTime(10, 0),
+            'note' => 'DP 50%.',
+        ]);
     }
 
     /**
@@ -560,7 +709,34 @@ class DatabaseSeeder extends Seeder
             Lens::create($lens);
         }
 
+        $this->seedAccessories();
+
         unset($singleVision, $progresif, $extraFrames, $extraLenses);
+    }
+
+    /**
+     * Item Master Item di luar frame & lensa: softlens, case/wadah, aksesoris.
+     */
+    private function seedAccessories(): void
+    {
+        $softlens = ProductCategory::where('slug', 'softlens')->value('id');
+        $case = ProductCategory::where('slug', 'case-wadah')->value('id');
+        $aksesoris = ProductCategory::where('slug', 'aksesoris')->value('id');
+
+        $rows = [
+            ['sku' => 'SL-AC-001', 'name' => 'Acuvue Moist Daily', 'brand' => 'Acuvue', 'category_id' => $softlens, 'buy_price' => 120000, 'sell_price' => 225000, 'stock' => 40, 'min_stock' => 10, 'description' => 'Softlens harian sekali pakai.'],
+            ['sku' => 'SL-CL-002', 'name' => 'Softlens Bulanan Natural', 'brand' => 'Clens', 'category_id' => $softlens, 'buy_price' => 85000, 'sell_price' => 175000, 'stock' => 24, 'min_stock' => 8, 'description' => 'Softlens bulanan warna natural.'],
+            ['sku' => 'CS-CL-001', 'name' => 'Case Kacamata Metal', 'brand' => 'Optik', 'category_id' => $case, 'buy_price' => 25000, 'sell_price' => 65000, 'stock' => 35, 'min_stock' => 10, 'description' => 'Wadah kacamata hardcase.'],
+            ['sku' => 'CS-CL-002', 'name' => 'Silicone Case + Kain', 'brand' => 'Optik', 'category_id' => $case, 'buy_price' => 12000, 'sell_price' => 35000, 'stock' => 50, 'min_stock' => 15, 'description' => 'Case silikon lengkap dengan kain lap.'],
+            ['sku' => 'AC-CL-001', 'name' => 'Tali Kacamata Silicone', 'brand' => 'Everyday', 'category_id' => $aksesoris, 'buy_price' => 8000, 'sell_price' => 25000, 'stock' => 60, 'min_stock' => 20, 'description' => 'Tali penahan kacamata.'],
+            ['sku' => 'AC-CL-002', 'name' => 'Cairan Pembersih Lensa 60ml', 'brand' => 'Opticare', 'category_id' => $aksesoris, 'buy_price' => 18000, 'sell_price' => 45000, 'stock' => 3, 'min_stock' => 10, 'description' => 'Solution pembersih lensa harian.'],
+        ];
+
+        foreach ($rows as $row) {
+            Accessory::create($row + ['status' => 'active']);
+        }
+
+        unset($softlens, $case, $aksesoris, $rows);
     }
 
     /**
@@ -727,6 +903,12 @@ class DatabaseSeeder extends Seeder
             $subtotal = 0.0;
             $lineCount = $index % 3 === 0 ? 2 : 1;
 
+            $wearer = TransactionUser::create([
+                'transaction_id' => $transaction->id,
+                'name' => $customer->name,
+                'prescription_id' => $transaction->prescription_id,
+            ]);
+
             for ($line = 0; $line < $lineCount; $line++) {
                 $isFrame = $line === 0 ? $useFrame : ! $useFrame;
 
@@ -749,6 +931,7 @@ class DatabaseSeeder extends Seeder
 
                 TransactionItem::create([
                     'transaction_id' => $transaction->id,
+                    'transaction_user_id' => $wearer->id,
                     'item_type' => $itemType,
                     'frame_id' => $frameId,
                     'lens_id' => $lensId,

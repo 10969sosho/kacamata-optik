@@ -55,7 +55,7 @@ class RoleAccessTest extends TestCase
 
         foreach ([
             'dashboard', 'frames.index', 'frames.create', 'lenses.index', 'lenses.create',
-            'categories.index', 'customers.index', 'customers.create', 'prescriptions.index',
+            'items.index', 'categories.index', 'customers.index', 'customers.create', 'prescriptions.index',
             'prescriptions.create', 'pos.create', 'transactions.index', 'promotions.index',
             'promotions.create', 'reports.index',
         ] as $route) {
@@ -76,6 +76,7 @@ class RoleAccessTest extends TestCase
     {
         $staff = $this->staff();
 
+        $this->actingAs($staff)->get(route('items.index'))->assertForbidden();
         $this->actingAs($staff)->get(route('frames.index'))->assertForbidden();
         $this->actingAs($staff)->get(route('lenses.index'))->assertForbidden();
         $this->actingAs($staff)->get(route('categories.index'))->assertForbidden();
@@ -96,7 +97,7 @@ class RoleAccessTest extends TestCase
     {
         $customer = $this->customer();
 
-        foreach (['portal.index', 'portal.prescriptions', 'portal.transactions', 'portal.promos'] as $route) {
+        foreach (['portal.index', 'portal.transactions', 'portal.promos'] as $route) {
             $this->actingAs($customer)->get(route($route))->assertOk();
         }
 
