@@ -14,11 +14,35 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  */
 class TransactionUser extends Model
 {
+    /** @var array<string, string> */
+    protected $attributes = [
+        'status' => 'ordered',
+    ];
+
+    /**
+     * Status pengerjaan pesanan, berlaku per pemakai (bukan per transaksi).
+     *
+     * @var list<string>
+     */
+    public const STATUSES = ['ordered', 'processing', 'ready', 'completed', 'cancelled'];
+
+    /** @var array<string, string> */
+    public const STATUS_LABELS = [
+        'ordered' => 'Ordered (Dipesan)',
+        'processing' => 'Processing (Diproses)',
+        'ready' => 'Ready (Siap Diambil)',
+        'completed' => 'Completed (Selesai)',
+        'cancelled' => 'Cancelled (Dibatalkan)',
+    ];
+
     /** @var list<string> */
     protected $fillable = [
         'transaction_id',
         'name',
         'prescription_id',
+        'status',
+        'ro1',
+        'ro2',
     ];
 
     public function transaction(): BelongsTo
@@ -35,5 +59,10 @@ class TransactionUser extends Model
     public function items(): HasMany
     {
         return $this->hasMany(TransactionItem::class);
+    }
+
+    public function statusLabel(): string
+    {
+        return self::STATUS_LABELS[$this->status] ?? ucfirst($this->status);
     }
 }

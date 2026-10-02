@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Transaction;
+use App\Models\TransactionUser;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -46,6 +47,28 @@ class TransactionController extends Controller
         $transaction->update(['status' => $data['status']]);
 
         return back()->with('success', "Status transaksi diubah menjadi {$data['status']}.");
+    }
+
+    /**
+     * Update status pengerjaan + petugas (RO1 periksa mata, RO2 potong lensa)
+     * untuk satu pemakai dalam transaksi.
+     */
+    public function updateUser(Request $request, Transaction $transaction, TransactionUser $transactionUser): RedirectResponse
+    {
+        abort_unless((int) $transactionUser->transaction_id === (int) $transaction->id, 404);
+
+        $data = $request->validate([
+            'status' => ['required', 'in:'.implode(',', TransactionUser::STATUSES)],
+            'ro1' => ['nullable', 'string', 'max:120'],
+            'ro2' => ['nullable', 'string', 'max:120'],
+        ]);
+
+        $transactionUser->update($data);
+
+        return back()->with(
+            'success',
+            "Pemakai \"{$transactionUser->name}\" → status {$transactionUser->status}, RO1 ".($transactionUser->ro1 ?: '-').', RO2 '.($transactionUser->ro2 ?: '-').'.'
+        );
     }
 
     public function print(Transaction $transaction): View

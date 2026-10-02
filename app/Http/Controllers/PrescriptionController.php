@@ -74,6 +74,7 @@ class PrescriptionController extends Controller
             'doctor_or_optician' => ['required', 'string', 'max:120'],
             'examination_date' => ['required', 'date'],
             'prescription_type' => ['nullable', 'string', 'max:50'],
+            'source' => ['nullable', 'in:'.implode(',', array_keys(Prescription::SOURCES))],
             'od_sph' => ['nullable', 'string', 'max:10'],
             'od_cyl' => ['nullable', 'string', 'max:10'],
             'od_axis' => ['nullable', 'string', 'max:10'],
@@ -90,6 +91,7 @@ class PrescriptionController extends Controller
         ]);
 
         $data['prescription_type'] = ! empty($data['prescription_type']) ? $data['prescription_type'] : 'Distance';
+        $data['source'] = ! empty($data['source']) ? $data['source'] : 'in_store';
 
         return $data;
     }

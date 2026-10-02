@@ -54,6 +54,7 @@ class MemberPortalTest extends TestCase
             'customer_id' => $this->customer->id,
             'doctor_or_optician' => 'Optometris Dian',
             'examination_date' => now()->toDateString(),
+            'source' => 'bring_own',
             'od_sph' => '-2.50', 'os_sph' => '-2.25', 'pd_total' => '60',
         ]);
 
@@ -82,6 +83,9 @@ class MemberPortalTest extends TestCase
             'transaction_id' => $this->transaction->id,
             'name' => 'Raka (Anak 1)',
             'prescription_id' => $rx->id,
+            'status' => 'processing',
+            'ro1' => 'Optometris Sari',
+            'ro2' => 'Teknisi Rudi',
         ]);
 
         TransactionItem::create([
@@ -129,6 +133,10 @@ class MemberPortalTest extends TestCase
             ->assertSee($this->transaction->invoice_number)
             ->assertSee('Ringkasan Pembayaran')
             ->assertSee('Pemakai: Raka (Anak 1)')
+            ->assertSee('Processing (Diproses)')
+            ->assertSee('RO1 (Periksa Mata)')
+            ->assertSee('Teknisi Rudi')
+            ->assertSee('Bawa Resep Sendiri')
             ->assertSee('Ray-Ban Aviator')
             ->assertSee('Resep Kacamata')
             ->assertSee('Riwayat Pembayaran')

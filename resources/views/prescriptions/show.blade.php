@@ -30,7 +30,7 @@
                 </div>
             </div>
 
-            <div class="grid gap-4 border-b border-slate-200 py-5 text-sm sm:grid-cols-3">
+            <div class="grid gap-4 border-b border-slate-200 py-5 text-sm sm:grid-cols-4">
                 <div>
                     <p class="text-[11px] uppercase tracking-wider text-slate-400">Nama Pasien</p>
                     <p class="font-bold text-slate-900">{{ $prescription->customer?->name }}</p>
@@ -42,6 +42,10 @@
                 <div>
                     <p class="text-[11px] uppercase tracking-wider text-slate-400">Tipe Resep</p>
                     <p class="font-bold text-slate-900">{{ $prescription->prescription_type ?: '-' }}</p>
+                </div>
+                <div>
+                    <p class="text-[11px] uppercase tracking-wider text-slate-400">Sumber Resep</p>
+                    <p class="font-bold text-slate-900">{{ $prescription->sourceLabel() }}</p>
                 </div>
             </div>
 

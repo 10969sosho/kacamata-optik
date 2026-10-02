@@ -60,13 +60,18 @@ class PortalController extends Controller
      * Item transaksi dikelompokkan per pemakai (user), termasuk kelompok
      * "Umum" untuk item yang tidak terikat pemakai tertentu.
      *
-     * @return Collection<int, array{label: string, rx: Prescription|null, items: Collection<int, TransactionItem>}>
+     * @return Collection<int, array{user: TransactionUser|null, label: string, status: ?string, status_label: ?string, ro1: ?string, ro2: ?string, rx: Prescription|null, items: Collection<int, TransactionItem>}>
      */
     private function wearerGroups(Transaction $transaction): Collection
     {
         $groups = $transaction->users
             ->map(fn (TransactionUser $user): array => [
+                'user' => $user,
                 'label' => $user->name,
+                'status' => $user->status,
+                'status_label' => $user->statusLabel(),
+                'ro1' => $user->ro1,
+                'ro2' => $user->ro2,
                 'rx' => $user->prescription,
                 'items' => $transaction->items->where('transaction_user_id', $user->id)->values(),
             ])
@@ -76,7 +81,12 @@ class PortalController extends Controller
 
         if ($unassigned->isNotEmpty()) {
             $groups->push([
+                'user' => null,
                 'label' => 'Umum',
+                'status' => $transaction->status,
+                'status_label' => ucfirst($transaction->status),
+                'ro1' => null,
+                'ro2' => null,
                 'rx' => $transaction->prescription,
                 'items' => $unassigned->values(),
             ]);
@@ -84,7 +94,12 @@ class PortalController extends Controller
 
         if ($groups->isEmpty()) {
             $groups->push([
+                'user' => null,
                 'label' => $transaction->customer?->name ?? 'Umum',
+                'status' => $transaction->status,
+                'status_label' => ucfirst($transaction->status),
+                'ro1' => null,
+                'ro2' => null,
                 'rx' => $transaction->prescription,
                 'items' => $transaction->items,
             ]);

@@ -97,11 +97,15 @@ class PosController extends Controller
             'users.*.items.*.type' => ['required', 'in:frame,lens,accessory'],
             'users.*.items.*.id' => ['required', 'integer'],
             'users.*.items.*.qty' => ['required', 'integer', 'min:1'],
+            'users.*.ro1' => ['nullable', 'string', 'max:120'],
+            'users.*.ro2' => ['nullable', 'string', 'max:120'],
             'users.*.prescription_id' => ['nullable', 'integer', 'exists:prescriptions,id'],
             'items' => ['nullable', 'array', 'min:1'],
             'items.*.type' => ['required', 'in:frame,lens,accessory'],
             'items.*.id' => ['required', 'integer'],
             'items.*.qty' => ['required', 'integer', 'min:1'],
+            'ro1' => ['nullable', 'string', 'max:120'],
+            'ro2' => ['nullable', 'string', 'max:120'],
             'promo_id' => ['nullable', 'exists:promotions,id'],
             'payment_method' => ['required', 'in:cash,transfer,qris,card'],
             'payment_status' => ['required', 'in:paid,down_payment'],
@@ -138,12 +142,13 @@ class PosController extends Controller
                 $prescriptionIds[$index] = $group['prescription_id'] ?? null;
 
                 if (! $prescriptionIds[$index] && isset($inlinePrescriptions[$index])) {
-                    $prescriptionIds[$index] = Prescription::create(
-                        $inlinePrescriptions[$index] + [
-                            'customer_id' => (int) $data['customer_id'],
-                            'prescription_type' => ($inlinePrescriptions[$index]['prescription_type'] ?? null) ?: 'Distance',
-                        ]
-                    )->id;
+                    $inline = $inlinePrescriptions[$index] + [
+                        'customer_id' => (int) $data['customer_id'],
+                        'prescription_type' => ($inlinePrescriptions[$index]['prescription_type'] ?? null) ?: 'Distance',
+                    ];
+                    $inline['source'] = ($inline['source'] ?? null) ?: 'in_store';
+
+                    $prescriptionIds[$index] = Prescription::create($inline)->id;
                 }
             }
 
@@ -169,6 +174,9 @@ class PosController extends Controller
                     'transaction_id' => $transaction->id,
                     'name' => $group['name'],
                     'prescription_id' => $prescriptionIds[$index] ?? null,
+                    'status' => 'ordered',
+                    'ro1' => $group['ro1'] ?? null,
+                    'ro2' => $group['ro2'] ?? null,
                 ]);
 
                 foreach ($linesByGroup[$index] as $line) {
@@ -222,7 +230,7 @@ class PosController extends Controller
      * satu pemakai bernama customer.
      *
      * @param  array<string, mixed>  $data
-     * @return array<int, array{name: string, items: array<int, array<string, mixed>>, prescription_id: ?int, new_prescription: bool, prescription: array<string, mixed>}>
+     * @return array<int, array{name: string, items: array<int, array<string, mixed>>, prescription_id: ?int, new_prescription: bool, prescription: array<string, mixed>, ro1: ?string, ro2: ?string}>
      */
     private function resolveGroups(Request $request, array $data): array
     {
@@ -236,6 +244,8 @@ class PosController extends Controller
                     'prescription_id' => ! empty($user['prescription_id']) ? (int) $user['prescription_id'] : null,
                     'new_prescription' => $request->boolean("users.{$index}.new_prescription"),
                     'prescription' => $request->input("users.{$index}.prescription") ?? [],
+                    'ro1' => $this->personName($user['ro1'] ?? null),
+                    'ro2' => $this->personName($user['ro2'] ?? null),
                 ];
             }
 
@@ -250,14 +260,26 @@ class PosController extends Controller
             'prescription_id' => ! empty($data['prescription_id']) ? (int) $data['prescription_id'] : null,
             'new_prescription' => (bool) ($data['new_prescription'] ?? false),
             'prescription' => $request->input('prescription') ?? [],
+            'ro1' => $this->personName($request->input('ro1')),
+            'ro2' => $this->personName($request->input('ro2')),
         ]];
+    }
+
+    /**
+     * Nama petugas (RO1 / RO2) dikirim sebagai teks bebas, dikosongkan bila kosong.
+     */
+    private function personName(mixed $value): ?string
+    {
+        $name = trim((string) $value);
+
+        return $name === '' ? null : $name;
     }
 
     /**
      * Validasi resep tiap pemakai: pemakai yang memilih lensa wajib punya resep
      * (resep tersimpan atau input baru). Resep baru divalidasi per pemakai.
      *
-     * @param  array<int, array{name: string, items: array<int, array<string, mixed>>, prescription_id: ?int, new_prescription: bool, prescription: array<string, mixed>}>  $groups
+     * @param  array<int, array{name: string, items: array<int, array<string, mixed>>, prescription_id: ?int, new_prescription: bool, prescription: array<string, mixed>, ro1: ?string, ro2: ?string}>  $groups
      * @return array<int, array<string, mixed>>
      */
     private function validatePrescriptions(Request $request, array $groups): array
@@ -298,6 +320,7 @@ class PosController extends Controller
             "{$key}.doctor_or_optician" => ['required', 'string', 'max:120'],
             "{$key}.examination_date" => ['required', 'date'],
             "{$key}.prescription_type" => ['nullable', 'string', 'max:50'],
+            "{$key}.source" => ['nullable', 'in:'.implode(',', array_keys(Prescription::SOURCES))],
             "{$key}.od_sph" => ['nullable', 'string', 'max:10'],
             "{$key}.od_cyl" => ['nullable', 'string', 'max:10'],
             "{$key}.od_axis" => ['nullable', 'string', 'max:10'],

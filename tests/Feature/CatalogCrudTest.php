@@ -152,16 +152,47 @@ class CatalogCrudTest extends TestCase
             'doctor_or_optician' => 'Optometris Dian',
             'examination_date' => now()->toDateString(),
             'prescription_type' => 'Distance',
+            'source' => 'bring_own',
             'od_sph' => '-1.25', 'od_cyl' => '-0.50', 'od_axis' => '90',
             'os_sph' => '-1.00', 'pd_total' => '63',
         ])->assertRedirect();
 
         $rx = Prescription::firstOrFail();
 
+        $this->assertSame('bring_own', $rx->source);
+        $this->assertSame('Bawa Resep Sendiri', $rx->sourceLabel());
+
         $this->actingAs($this->admin)->get(route('prescriptions.show', $rx))
             ->assertOk()
             ->assertSee('Optometris Dian')
+            ->assertSee('Bawa Resep Sendiri')
             ->assertSee('-1.25');
+    }
+
+    public function test_prescription_source_defaults_to_in_store(): void
+    {
+        $customer = Customer::create([
+            'member_id' => 'KCM-000021', 'name' => 'Rudi', 'phone' => '081666666667',
+            'status' => 'active', 'registered_at' => now()->toDateString(),
+        ]);
+
+        $this->actingAs($this->admin)->post(route('prescriptions.store'), [
+            'customer_id' => $customer->id,
+            'doctor_or_optician' => 'Dr. Robert Sp.M',
+            'examination_date' => now()->toDateString(),
+        ])->assertRedirect();
+
+        $rx = Prescription::firstOrFail();
+
+        $this->assertSame('in_store', $rx->source);
+        $this->assertSame('In Store', $rx->sourceLabel());
+
+        $this->actingAs($this->admin)->post(route('prescriptions.store'), [
+            'customer_id' => $customer->id,
+            'doctor_or_optician' => 'Dr. Robert Sp.M',
+            'examination_date' => now()->toDateString(),
+            'source' => 'di_kantor',
+        ])->assertSessionHasErrors('source');
     }
 
     public function test_promotion_crud_flow(): void

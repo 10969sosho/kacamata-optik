@@ -62,7 +62,15 @@ class PosTransactionTest extends TestCase
             ->assertOk()
             ->assertSee('Keranjang')
             ->assertSee('Pemakai')
-            ->assertSee('Tambah Pemakai');
+            ->assertSee('Tambah Pemakai')
+            // tiap item pemakai harus ikut terkirim sebagai field form
+            ->assertSee('users[${ui}][items][${liIdx}][type]', false)
+            ->assertSee('users[${ui}][items][${liIdx}][id]', false)
+            ->assertSee('users[${ui}][items][${liIdx}][qty]', false)
+            // RO1 / RO2 dan sumber resep juga harus ikut terkirim
+            ->assertSee('users[${ui}][ro1]', false)
+            ->assertSee('users[${ui}][ro2]', false)
+            ->assertSee('users[${ui}][prescription][source]', false);
     }
 
     public function test_pos_creates_transaction_items_payment_and_decrements_stock(): void
@@ -359,6 +367,106 @@ class PosTransactionTest extends TestCase
             ->assertSessionHas('success');
 
         $this->assertSame('ready', $transaction->fresh()->status);
+    }
+
+    public function test_pos_wearer_stores_ro_names_status_and_prescription_source(): void
+    {
+        $this->actingAs($this->staff)->post(route('pos.store'), [
+            'customer_id' => $this->customer->id,
+            'users' => [
+                [
+                    'name' => 'Bambang Sutopo',
+                    'items' => [
+                        ['type' => 'frame', 'id' => $this->frame->id, 'qty' => 1],
+                        ['type' => 'lens', 'id' => $this->lens->id, 'qty' => 1],
+                    ],
+                    'ro1' => 'Optometris Sari',
+                    'ro2' => 'Teknisi Rudi',
+                    'new_prescription' => 1,
+                    'prescription' => [
+                        'doctor_or_optician' => 'Optometris Sari',
+                        'examination_date' => now()->toDateString(),
+                        'od_sph' => '-1.25',
+                        'source' => 'bring_own',
+                    ],
+                ],
+                [
+                    'name' => 'Anak 1',
+                    'items' => [['type' => 'frame', 'id' => $this->frame->id, 'qty' => 1]],
+                    'ro1' => '   ',
+                    'ro2' => 'Teknisi Rudi',
+                ],
+            ],
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'status' => 'ordered',
+        ])->assertRedirect();
+
+        $transaction = Transaction::latest('id')->firstOrFail();
+
+        $this->assertSame(['ordered', 'ordered'], $transaction->users()->pluck('status')->all());
+
+        $wearer = $transaction->users()->where('name', 'Bambang Sutopo')->firstOrFail();
+        $this->assertSame('Optometris Sari', $wearer->ro1);
+        $this->assertSame('Teknisi Rudi', $wearer->ro2);
+        $this->assertSame('bring_own', $wearer->prescription->source);
+
+        $blank = $transaction->users()->where('name', 'Anak 1')->firstOrFail();
+        $this->assertNull($blank->ro1);
+        $this->assertSame('Teknisi Rudi', $blank->ro2);
+
+        $this->actingAs($this->staff)->get(route('transactions.show', $transaction))
+            ->assertOk()
+            ->assertSee('RO1 · Periksa Mata')
+            ->assertSee('Optometris Sari');
+    }
+
+    public function test_transaction_wearer_status_and_ro_can_be_updated(): void
+    {
+        $this->actingAs($this->staff)->post(route('pos.store'), [
+            'customer_id' => $this->customer->id,
+            'users' => [
+                ['name' => 'Adi', 'items' => [['type' => 'frame', 'id' => $this->frame->id, 'qty' => 1]]],
+            ],
+            'payment_method' => 'cash',
+            'payment_status' => 'paid',
+            'status' => 'ordered',
+        ])->assertRedirect();
+
+        $transaction = Transaction::latest('id')->firstOrFail();
+        $wearer = $transaction->users()->firstOrFail();
+
+        $this->actingAs($this->staff)
+            ->patch(route('transactions.users.update', [$transaction, $wearer]), [
+                'status' => 'ready',
+                'ro1' => 'Optometris Sari',
+                'ro2' => '',
+            ])
+            ->assertSessionHas('success');
+
+        $wearer->refresh();
+        $this->assertSame('ready', $wearer->status);
+        $this->assertSame('Optometris Sari', $wearer->ro1);
+        $this->assertNull($wearer->ro2);
+
+        $this->actingAs($this->staff)
+            ->patch(route('transactions.users.update', [$transaction, $wearer]), ['status' => 'selesai'])
+            ->assertSessionHasErrors('status');
+
+        $this->assertSame('ready', $wearer->fresh()->status);
+
+        $other = Transaction::create([
+            'invoice_number' => 'TRX-20261002-00099',
+            'customer_id' => $this->customer->id,
+            'staff_id' => $this->staff->id,
+            'subtotal' => 100000, 'discount_amount' => 0, 'total_amount' => 100000,
+            'payment_status' => 'paid', 'payment_method' => 'cash',
+            'status' => 'ordered', 'transaction_date' => now(),
+        ]);
+
+        $this->actingAs($this->staff)
+            ->patch(route('transactions.users.update', [$other, $wearer]), ['status' => 'ready'])
+            ->assertNotFound();
     }
 
     public function test_transaction_detail_and_print_pages_render(): void

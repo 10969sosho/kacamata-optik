@@ -7,9 +7,20 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Prescription extends Model
 {
+    /**
+     * Sumber resep: diperiksa di toko (in_store) atau dibawa dari luar (bring_own).
+     *
+     * @var array<string, string>
+     */
+    public const SOURCES = [
+        'in_store' => 'In Store',
+        'bring_own' => 'Bawa Resep Sendiri',
+    ];
+
     /** @var array<string, string> */
     protected $attributes = [
         'prescription_type' => 'Distance',
+        'source' => 'in_store',
     ];
 
     /** @var list<string> */
@@ -18,6 +29,7 @@ class Prescription extends Model
         'doctor_or_optician',
         'examination_date',
         'prescription_type',
+        'source',
         'od_sph',
         'od_cyl',
         'od_axis',
@@ -41,5 +53,10 @@ class Prescription extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    public function sourceLabel(): string
+    {
+        return self::SOURCES[$this->source] ?? (string) $this->source;
     }
 }

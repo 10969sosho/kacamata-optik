@@ -84,12 +84,22 @@
         <div class="space-y-4">
             @foreach ($groups as $group)
                 <div class="rounded-2xl border border-slate-100 bg-slate-50 p-4">
-                    <div class="mb-3 flex items-center justify-between">
+                    <div class="mb-3 flex items-center justify-between gap-2">
                         <p class="text-[11px] font-bold uppercase tracking-wider text-red-700">
                             Pemakai: {{ $group['label'] }}
                         </p>
-                        <span class="text-[11px] text-slate-500">{{ $group['items']->count() }} item</span>
+                        <span class="flex items-center gap-1.5 text-[11px] text-slate-500">
+                            <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700 shadow-sm">{{ $group['status_label'] }}</span>
+                            <span>{{ $group['items']->count() }} item</span>
+                        </span>
                     </div>
+
+                    @if ($group['ro1'] || $group['ro2'])
+                        <p class="mb-3 rounded-lg bg-white px-3 py-2 text-[11px] text-slate-500">
+                            RO1 (Periksa Mata): <b class="text-slate-700">{{ $group['ro1'] ?: '-' }}</b>
+                            · RO2 (Potong Lensa): <b class="text-slate-700">{{ $group['ro2'] ?: '-' }}</b>
+                        </p>
+                    @endif
 
                     <ul class="divide-y divide-slate-200/70">
                         @forelse ($group['items'] as $item)
@@ -130,7 +140,10 @@
                                 <span>PD Total: <b class="text-slate-800">{{ $group['rx']->pd_total ?: '-' }} mm</b></span>
                                 <span>Fitting: <b class="text-slate-800">{{ $group['rx']->fitting_height ?: '-' }}</b></span>
                             </div>
-                            <p class="mt-1 text-[11px] text-slate-400">{{ $group['rx']->doctor_or_optician }}</p>
+                            <p class="mt-1 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
+                                <span>{{ $group['rx']->doctor_or_optician }}</span>
+                                <span class="rounded-full bg-slate-50 px-2 py-0.5 font-semibold text-slate-500">{{ $group['rx']->sourceLabel() }}</span>
+                            </p>
                         </div>
                     @endif
                 </div>

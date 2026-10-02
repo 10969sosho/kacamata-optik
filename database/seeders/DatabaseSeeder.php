@@ -315,6 +315,7 @@ class DatabaseSeeder extends Seeder
             'doctor_or_optician' => 'Dr. Robert Sp.M',
             'examination_date' => '2026-08-15',
             'prescription_type' => 'Distance',
+            'source' => 'in_store',
             'od_sph' => '-1.25',
             'od_cyl' => '-0.50',
             'od_axis' => '90',
@@ -335,6 +336,7 @@ class DatabaseSeeder extends Seeder
             'doctor_or_optician' => 'Optometris Dian',
             'examination_date' => '2026-09-01',
             'prescription_type' => 'Progressive',
+            'source' => 'bring_own',
             'od_sph' => '-2.50',
             'od_cyl' => '-1.00',
             'od_axis' => '180',
@@ -545,6 +547,9 @@ class DatabaseSeeder extends Seeder
             'transaction_id' => $transaction->id,
             'name' => $name,
             'prescription_id' => $prescriptionId,
+            'status' => $transaction->status,
+            'ro1' => 'Optometris Sari',
+            'ro2' => 'Teknisi Rudi',
         ]);
 
         TransactionItem::where('transaction_id', $transaction->id)
@@ -570,6 +575,7 @@ class DatabaseSeeder extends Seeder
             'os_axis' => '175',
             'pd_total' => '58',
             'notes' => 'Resep anak pertama.',
+            'source' => 'in_store',
         ]);
 
         $resepAnak2 = Prescription::create([
@@ -580,6 +586,7 @@ class DatabaseSeeder extends Seeder
             'os_sph' => '-1.50',
             'pd_total' => '56',
             'notes' => 'Resep anak kedua.',
+            'source' => 'bring_own',
         ]);
 
         $plan = [
@@ -636,6 +643,9 @@ class DatabaseSeeder extends Seeder
                 'transaction_id' => $transaction->id,
                 'name' => $group['name'],
                 'prescription_id' => $group['rx'],
+                'status' => $transaction->status,
+                'ro1' => 'Optometris Dian',
+                'ro2' => 'Teknisi Rudi',
             ]);
 
             foreach ($group['lines'] as $line) {
@@ -788,7 +798,7 @@ class DatabaseSeeder extends Seeder
             ['KCM-000022', 'Optometris Maya', '2026-06-21', 'Distance', '-4.25', '-1.50', '15', '-4.50', '-1.25', '165', '65', '20'],
         ];
 
-        foreach ($seed as $row) {
+        foreach ($seed as $index => $row) {
             $customerId = Customer::where('member_id', $row[0])->value('id');
 
             Prescription::create([
@@ -796,6 +806,7 @@ class DatabaseSeeder extends Seeder
                 'doctor_or_optician' => $row[1],
                 'examination_date' => $row[2],
                 'prescription_type' => $row[3],
+                'source' => $index % 2 === 0 ? 'in_store' : 'bring_own',
                 'od_sph' => $row[4], 'od_cyl' => $row[5], 'od_axis' => $row[6], 'od_add' => '+0.75', 'od_pd' => '32',
                 'os_sph' => $row[7], 'os_cyl' => $row[8], 'os_axis' => $row[9], 'os_add' => '+0.75', 'os_pd' => '32',
                 'pd_total' => $row[10], 'fitting_height' => $row[11],
@@ -907,6 +918,9 @@ class DatabaseSeeder extends Seeder
                 'transaction_id' => $transaction->id,
                 'name' => $customer->name,
                 'prescription_id' => $transaction->prescription_id,
+                'status' => $status,
+                'ro1' => 'Optometris Sari',
+                'ro2' => 'Teknisi Rudi',
             ]);
 
             for ($line = 0; $line < $lineCount; $line++) {

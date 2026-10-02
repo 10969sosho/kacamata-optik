@@ -40,6 +40,9 @@
                 $printGroups = $transaction->users()->get()
                     ->map(fn ($user) => [
                         'label' => $user->name,
+                        'status' => $user->statusLabel(),
+                        'ro1' => $user->ro1,
+                        'ro2' => $user->ro2,
                         'items' => $transaction->items->where('transaction_user_id', $user->id)->values(),
                     ])
                     ->values();
@@ -47,11 +50,11 @@
                 $printUnassigned = $transaction->items->whereNull('transaction_user_id');
 
                 if ($printUnassigned->isNotEmpty()) {
-                    $printGroups->push(['label' => 'Umum', 'items' => $printUnassigned->values()]);
+                    $printGroups->push(['label' => 'Umum', 'status' => null, 'ro1' => null, 'ro2' => null, 'items' => $printUnassigned->values()]);
                 }
 
                 if ($printGroups->isEmpty()) {
-                    $printGroups->push(['label' => $transaction->customer?->name ?? 'Umum', 'items' => $transaction->items]);
+                    $printGroups->push(['label' => $transaction->customer?->name ?? 'Umum', 'status' => null, 'ro1' => null, 'ro2' => null, 'items' => $transaction->items]);
                 }
             @endphp
 
@@ -69,6 +72,14 @@
                         <tr class="border-t border-slate-200">
                             <td colspan="4" class="pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                                 Pemakai: {{ $group['label'] }}
+                                @if ($group['status'])
+                                    <span class="text-slate-500">· {{ $group['status'] }}</span>
+                                @endif
+                                @if ($group['ro1'] || $group['ro2'])
+                                    <span class="block font-normal normal-case tracking-normal text-slate-400">
+                                        RO1: {{ $group['ro1'] ?: '-' }} · RO2: {{ $group['ro2'] ?: '-' }}
+                                    </span>
+                                @endif
                             </td>
                         </tr>
                         @foreach ($group['items'] as $item)

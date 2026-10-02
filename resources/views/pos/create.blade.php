@@ -45,7 +45,7 @@ function pos() {
         fmt(n) { return 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(n)); },
 
         rxDefaults() {
-            const rx = { prescription_type: '', notes: '' };
+            const rx = { prescription_type: '', notes: '', source: 'in_store' };
             RX_FIELDS.forEach(f => rx[f] = '');
             rx.examination_date = this.today;
             return rx;
@@ -74,6 +74,8 @@ function pos() {
                 rx_mode: snap.prescription_id ? 'existing' : 'new',
                 prescription_id: snap.prescription_id || '',
                 rx: rx,
+                ro1: snap.ro1 || '',
+                ro2: snap.ro2 || '',
             };
         },
 
@@ -279,12 +281,35 @@ function pos() {
                             <div class="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
                                 <input type="hidden" :name="`users[${ui}][name]`" :value="u.name">
 
+                                <!-- item pemakai ikut terkirim saat form disubmit -->
+                                <template x-for="(li, liIdx) in u.items" :key="'field-' + li._k">
+                                    <span>
+                                        <input type="hidden" :name="`users[${ui}][items][${liIdx}][type]`" :value="li.type">
+                                        <input type="hidden" :name="`users[${ui}][items][${liIdx}][id]`" :value="li.id">
+                                        <input type="hidden" :name="`users[${ui}][items][${liIdx}][qty]`" :value="li.qty">
+                                    </span>
+                                </template>
+
                                 <div class="mb-3 flex items-center gap-2">
                                     <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-red-600 text-[11px] font-bold text-white" x-text="ui + 1"></span>
                                     <input x-model="u.name" type="text" placeholder="Nama pemakai (mis. Adi, Anak 1)"
                                            class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold focus:border-red-500 focus:outline-none">
                                     <button type="button" x-show="users.length > 1" @click="removeUser(ui)"
                                             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50">Hapus</button>
+                                </div>
+
+                                <!-- petugas: RO1 periksa mata, RO2 potong lensa -->
+                                <div class="mb-3 grid gap-2 sm:grid-cols-2">
+                                    <label class="block">
+                                        <span class="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">RO1 · Periksa Mata</span>
+                                        <input type="text" :name="`users[${ui}][ro1]`" x-model="u.ro1" maxlength="120" placeholder="Nama petugas refraksi"
+                                               class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:border-red-500 focus:outline-none">
+                                    </label>
+                                    <label class="block">
+                                        <span class="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">RO2 · Potong Lensa</span>
+                                        <input type="text" :name="`users[${ui}][ro2]`" x-model="u.ro2" maxlength="120" placeholder="Nama petugas lensa"
+                                               class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:border-red-500 focus:outline-none">
+                                    </label>
                                 </div>
 
                                 <!-- pemilihan item -->
@@ -363,6 +388,20 @@ function pos() {
                                             <input type="radio" value="existing" x-model="u.rx_mode" :name="`rx_mode_${ui}`" class="text-red-500 focus:ring-red-500/30"> Pakai resep tersimpan
                                         </label>
                                     </div>
+
+                                    <template x-if="u.rx_mode === 'new'">
+                                        <div class="mt-3">
+                                            <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">Sumber resep</p>
+                                            <div class="flex flex-wrap gap-3 text-xs">
+                                                <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
+                                                    <input type="radio" value="in_store" x-model="u.rx.source" :name="`users[${ui}][prescription][source]`" class="text-red-500 focus:ring-red-500/30"> In Store (periksa di toko)
+                                                </label>
+                                                <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
+                                                    <input type="radio" value="bring_own" x-model="u.rx.source" :name="`users[${ui}][prescription][source]`" class="text-red-500 focus:ring-red-500/30"> Bawa resep sendiri
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </template>
 
                                     <template x-if="u.rx_mode === 'existing'">
                                         <div class="mt-3">
@@ -454,7 +493,7 @@ function pos() {
                                             <p class="truncate text-xs font-semibold text-slate-900" x-text="li.name"></p>
                                             <p class="text-[11px] text-slate-500">
                                                 <span x-text="li.qty + ' × ' + fmt(li.price)"></span>
-                                                <span class="text-red-600" x-show="li.type === 'lens'"> · resep: <span x-text="u.rx_mode === 'existing' ? 'tersimpan' : 'input baru'"></span></span>
+                                                <span class="text-red-600" x-show="li.type === 'lens'"> · resep: <span x-text="u.rx_mode === 'existing' ? 'tersimpan' : (u.rx.source === 'bring_own' ? 'bawa resep sendiri' : 'in store')"></span></span>
                                             </p>
                                         </div>
                                         <span class="flex shrink-0 items-center gap-1.5">

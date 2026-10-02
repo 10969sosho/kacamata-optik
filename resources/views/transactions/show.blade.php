@@ -8,10 +8,17 @@
         $steps = ['ordered' => 'Dipesan', 'processing' => 'Diproses', 'ready' => 'Siap Diambil', 'completed' => 'Selesai'];
         $current = array_search($transaction->status, array_keys($steps), true);
 
+        $userStatusLabels = \App\Models\TransactionUser::STATUS_LABELS;
+
         $wearerGroups = $transaction->users()->with('prescription')->get()
             ->map(fn ($user) => [
+                'user' => $user,
                 'label' => $user->name,
                 'rx' => $user->prescription,
+                'status' => $user->statusLabel(),
+                'status_key' => $user->status,
+                'ro1' => $user->ro1,
+                'ro2' => $user->ro2,
                 'items' => $transaction->items->where('transaction_user_id', $user->id)->values(),
             ])
             ->values();
@@ -19,13 +26,27 @@
         $unassigned = $transaction->items->whereNull('transaction_user_id');
 
         if ($unassigned->isNotEmpty()) {
-            $wearerGroups->push(['label' => 'Umum', 'rx' => $transaction->prescription, 'items' => $unassigned->values()]);
+            $wearerGroups->push([
+                'user' => null,
+                'label' => 'Umum',
+                'rx' => $transaction->prescription,
+                'status' => null,
+                'status_key' => null,
+                'ro1' => null,
+                'ro2' => null,
+                'items' => $unassigned->values(),
+            ]);
         }
 
         if ($wearerGroups->isEmpty()) {
             $wearerGroups->push([
+                'user' => null,
                 'label' => $transaction->customer?->name ?? 'Umum',
                 'rx' => $transaction->prescription,
+                'status' => null,
+                'status_key' => null,
+                'ro1' => null,
+                'ro2' => null,
                 'items' => $transaction->items,
             ]);
         }
@@ -91,8 +112,16 @@
                                         Pemakai: {{ $group['label'] }}
                                         @if ($group['rx'])
                                             <a href="{{ route('prescriptions.show', $group['rx']) }}" class="ml-2 font-semibold normal-case text-red-600 underline">lihat resep</a>
+                                            <span class="ml-2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-slate-500">{{ $group['rx']->sourceLabel() }}</span>
                                         @endif
                                     </p>
+                                    @if ($group['user'])
+                                        <p class="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold normal-case text-red-700/80">
+                                            <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700">{{ $group['status'] }}</span>
+                                            <span>RO1: {{ $group['ro1'] ?: '-' }}</span>
+                                            <span>RO2: {{ $group['ro2'] ?: '-' }}</span>
+                                        </p>
+                                    @endif
                                 </td>
                             </tr>
                             @forelse ($group['items'] as $item)
@@ -136,15 +165,46 @@
         <div class="space-y-6">
             <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 class="mb-3 text-sm font-bold text-slate-900">Pemakai (User)</h2>
-                <ul class="space-y-2.5">
-                    @forelse ($wearerGroups as $index => $group)
-                        <li class="flex items-start justify-between gap-2 rounded-xl border border-slate-100 bg-slate-50 px-3 py-2.5">
-                            <span class="min-w-0">
-                                <span class="block truncate text-sm font-semibold text-slate-900">{{ $group['label'] }}</span>
-                                <span class="block text-[11px] text-slate-500">{{ $group['items']->count() }} item</span>
-                            </span>
-                            @if ($group['rx'])
-                                <a href="{{ route('prescriptions.show', $group['rx']) }}" class="shrink-0 text-[11px] font-semibold text-red-600 hover:underline">Resep</a>
+                <ul class="space-y-3">
+                    @forelse ($wearerGroups as $group)
+                        <li class="rounded-xl border border-slate-100 bg-slate-50 px-3 py-3">
+                            <div class="flex items-start justify-between gap-2">
+                                <span class="min-w-0">
+                                    <span class="block truncate text-sm font-semibold text-slate-900">{{ $group['label'] }}</span>
+                                    <span class="block text-[11px] text-slate-500">{{ $group['items']->count() }} item</span>
+                                </span>
+                                @if ($group['rx'])
+                                    <a href="{{ route('prescriptions.show', $group['rx']) }}" class="shrink-0 text-[11px] font-semibold text-red-600 hover:underline">Resep</a>
+                                @endif
+                            </div>
+
+                            @if ($group['user'])
+                                <form method="POST" action="{{ route('transactions.users.update', [$transaction, $group['user']]) }}" class="mt-3 space-y-2.5 border-t border-slate-100 pt-3">
+                                    @csrf @method('PATCH')
+                                    <label class="block">
+                                        <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Status Pesanan</span>
+                                        <select name="status" class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold focus:border-red-500 focus:outline-none">
+                                            @foreach ($userStatusLabels as $key => $label)
+                                                <option value="{{ $key }}" @selected($group['status_key'] === $key)>{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                    </label>
+
+                                    <div class="grid gap-2">
+                                        <label class="block">
+                                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">RO1 · Periksa Mata</span>
+                                            <input type="text" name="ro1" maxlength="120" value="{{ old("ro1.{$group['user']->id}", $group['ro1']) }}" placeholder="Nama petugas refraksi"
+                                                   class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs focus:border-red-500 focus:outline-none">
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">RO2 · Potong Lensa</span>
+                                            <input type="text" name="ro2" maxlength="120" value="{{ old("ro2.{$group['user']->id}", $group['ro2']) }}" placeholder="Nama petugas lensa"
+                                                   class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs focus:border-red-500 focus:outline-none">
+                                        </label>
+                                    </div>
+
+                                    <button class="w-full rounded-lg bg-red-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-red-700">Simpan Pemakai</button>
+                                </form>
                             @endif
                         </li>
                     @empty

@@ -41,6 +41,21 @@
                     <input name="prescription_type" value="{{ old('prescription_type', $rx?->prescription_type) }}" placeholder="Distance / Reading / Progressive"
                            class="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                 </div>
+                <div class="sm:col-span-3">
+                    <label class="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">Sumber Resep *</label>
+                    <div class="flex flex-wrap gap-3">
+                        @foreach (\App\Models\Prescription::SOURCES as $key => $label)
+                            <label class="flex cursor-pointer items-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm
+                                {{ old('source', $rx?->source ?? 'in_store') === $key ? 'border-red-500 bg-red-50 text-red-700' : 'border-slate-200 text-slate-600' }}">
+                                <input type="radio" name="source" value="{{ $key }}"
+                                       @checked(old('source', $rx?->source ?? 'in_store') === $key)
+                                       class="text-red-500 focus:ring-red-500/30">
+                                {{ $label }}
+                            </label>
+                        @endforeach
+                    </div>
+                    <p class="mt-1.5 text-xs text-slate-500">In Store = pasien diperiksa di toko · Bawa Resep Sendiri = resep hasil pemeriksaan di luar.</p>
+                </div>
             </div>
         </div>
 

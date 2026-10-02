@@ -72,6 +72,7 @@ Route::middleware(['auth', 'role:admin,staff'])->group(function () {
     Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
     Route::get('/transactions/{transaction}', [TransactionController::class, 'show'])->name('transactions.show');
     Route::patch('/transactions/{transaction}/status', [TransactionController::class, 'updateStatus'])->name('transactions.status');
+    Route::patch('/transactions/{transaction}/users/{transactionUser}', [TransactionController::class, 'updateUser'])->name('transactions.users.update');
     Route::get('/transactions/{transaction}/print', [TransactionController::class, 'print'])->name('transactions.print');
 });
 
