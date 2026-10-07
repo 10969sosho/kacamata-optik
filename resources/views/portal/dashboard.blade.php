@@ -43,10 +43,13 @@
                         <p class="text-[11px] font-medium text-slate-500">Tunjukkan ke kasir untuk scan</p>
                     </div>
                 </div>
-                <div class="hidden sm:block text-right pr-2">
-                    <span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600">
-                        <span class="h-1.5 w-1.5 rounded-full bg-red-600 animate-pulse"></span> QR Siap Scan
-                    </span>
+                <div class="flex items-center gap-2.5">
+                    <div class="hidden md:flex flex-col items-end text-right">
+                        <span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-0.5 text-[10px] font-bold text-red-600">
+                            <span class="h-1.5 w-1.5 rounded-full bg-red-600 animate-pulse"></span> QR Siap Scan
+                        </span>
+                    </div>
+                    <img src="{{ asset('images/eyeseeyou.png') }}" alt="EYE SEE YOU" class="h-12 w-12 sm:h-14 sm:w-14 object-contain rounded-xl border border-slate-100/80 shadow-xs bg-white p-0.5">
                 </div>
             </div>
 
