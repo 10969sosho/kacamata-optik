@@ -11,14 +11,18 @@
                 <div>
                     <p class="text-[10px] uppercase tracking-[0.25em] text-red-400">Kartu Member Digital</p>
                     <p class="mt-3 font-mono text-2xl font-extrabold tracking-widest">{{ $customer->member_id }}</p>
+                    <p class="mt-4 text-lg font-bold">{{ $customer->name }}</p>
+                    <p class="text-sm text-slate-400">{{ $customer->phone }}</p>
                 </div>
-                <span class="rounded-full bg-red-500/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300">
-                    {{ $customer->status === 'active' ? 'Aktif' : 'Nonaktif' }}
-                </span>
+                <div class="flex flex-col items-end">
+                    <span class="rounded-full bg-red-500/20 px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-red-300">
+                        {{ $customer->status === 'active' ? 'Aktif' : 'Nonaktif' }}
+                    </span>
+                    <div class="mt-3 flex h-20 w-20 sm:h-24 sm:w-24 items-center justify-center overflow-hidden rounded-2xl bg-white p-2 shadow-lg border border-white/20">
+                        <img src="{{ asset('images/eyeseeyou.png') }}" alt="EYE SEE YOU" class="h-full w-full object-contain">
+                    </div>
+                </div>
             </div>
-
-            <p class="mt-5 text-lg font-bold">{{ $customer->name }}</p>
-            <p class="text-sm text-slate-400">{{ $customer->phone }}</p>
 
             <div class="mt-5 flex items-end justify-between border-t border-white/10 pt-4">
                 <div>
@@ -43,13 +47,10 @@
                         <p class="text-[11px] font-medium text-slate-500">Tunjukkan ke kasir untuk scan</p>
                     </div>
                 </div>
-                <div class="flex items-center gap-2.5">
-                    <div class="hidden md:flex flex-col items-end text-right">
-                        <span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-0.5 text-[10px] font-bold text-red-600">
-                            <span class="h-1.5 w-1.5 rounded-full bg-red-600 animate-pulse"></span> QR Siap Scan
-                        </span>
-                    </div>
-                    <img src="{{ asset('images/eyeseeyou.png') }}" alt="EYE SEE YOU" class="h-12 w-12 sm:h-14 sm:w-14 object-contain rounded-xl border border-slate-100/80 shadow-xs bg-white p-0.5">
+                <div class="text-right pr-1">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-3 py-1 text-[11px] font-bold text-red-600">
+                        <span class="h-1.5 w-1.5 rounded-full bg-red-600 animate-pulse"></span> QR Siap Scan
+                    </span>
                 </div>
             </div>
 
