@@ -31,15 +31,56 @@
                 </div>
             </div>
 
-            <!-- barcode simulasi -->
-            <div class="mt-5 flex items-center gap-3 rounded-2xl bg-white/95 p-3">
-                <div class="flex h-12 flex-1 items-end gap-[3px] overflow-hidden">
-                    @for ($i = 0; $i < 42; $i++)
-                        <span class="h-full bg-slate-900 {{ $i % 3 === 0 ? 'w-[3px]' : ($i % 2 === 0 ? 'w-[2px]' : 'w-[1px]') }} {{ $i % 4 === 0 ? 'opacity-100' : 'opacity-80' }}"></span>
-                    @endfor
+            <!-- QR Code Member -->
+            <div class="mt-5 flex items-center justify-between rounded-2xl bg-white p-3.5 text-slate-900 shadow-sm">
+                <div class="flex items-center gap-3.5">
+                    <div class="flex h-18 w-18 items-center justify-center overflow-hidden rounded-xl bg-slate-50 p-1 border border-slate-100">
+                        <canvas id="qr-code-member" class="h-full w-full"></canvas>
+                    </div>
+                    <div>
+                        <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400">QR Kartu Member</p>
+                        <p class="font-mono text-sm font-black tracking-wider text-slate-800">{{ $customer->member_id }}</p>
+                        <p class="text-[11px] font-medium text-slate-500">Tunjukkan ke kasir untuk scan</p>
+                    </div>
                 </div>
-                <span class="font-mono text-[11px] font-bold text-slate-700">{{ str_replace('-', '', $customer->member_id) }}</span>
+                <div class="hidden sm:block text-right pr-2">
+                    <span class="inline-flex items-center gap-1.5 rounded-full bg-red-50 px-2.5 py-1 text-[11px] font-bold text-red-600">
+                        <span class="h-1.5 w-1.5 rounded-full bg-red-600 animate-pulse"></span> QR Siap Scan
+                    </span>
+                </div>
             </div>
+
+            <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.0/build/qrcode.min.js"></script>
+            <script>
+                document.addEventListener('DOMContentLoaded', function() {
+                    var canvas = document.getElementById('qr-code-member');
+                    var memberCode = '{{ $customer->member_id }}';
+
+                    function renderFallback() {
+                        if (!canvas || !canvas.parentNode) return;
+                        var img = new Image();
+                        img.src = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' + encodeURIComponent(memberCode);
+                        img.className = 'h-full w-full object-contain';
+                        img.alt = 'QR ' + memberCode;
+                        canvas.parentNode.replaceChild(img, canvas);
+                    }
+
+                    if (window.QRCode && typeof QRCode.toCanvas === 'function') {
+                        QRCode.toCanvas(canvas, memberCode, {
+                            width: 72,
+                            margin: 0,
+                            color: {
+                                dark: '#0f172a',
+                                light: '#ffffff'
+                            }
+                        }, function(error) {
+                            if (error) renderFallback();
+                        });
+                    } else {
+                        renderFallback();
+                    }
+                });
+            </script>
         </div>
     </div>
 
