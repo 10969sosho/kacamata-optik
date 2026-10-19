@@ -55,8 +55,8 @@ class RoleAccessTest extends TestCase
 
         foreach ([
             'dashboard', 'frames.index', 'frames.create', 'lenses.index', 'lenses.create',
-            'items.index', 'categories.index', 'customers.index', 'customers.create', 'prescriptions.index',
-            'prescriptions.create', 'pos.create', 'transactions.index', 'promotions.index',
+            'items.index', 'categories.index', 'customers.index', 'customers.create',
+            'pos.create', 'transactions.index', 'promotions.index',
             'promotions.create', 'reports.index',
         ] as $route) {
             $this->actingAs($admin)->get(route($route))->assertOk();
@@ -67,7 +67,7 @@ class RoleAccessTest extends TestCase
     {
         $staff = $this->staff();
 
-        foreach (['dashboard', 'pos.create', 'customers.index', 'transactions.index', 'prescriptions.index'] as $route) {
+        foreach (['dashboard', 'pos.create', 'customers.index', 'transactions.index'] as $route) {
             $this->actingAs($staff)->get(route($route))->assertOk();
         }
     }

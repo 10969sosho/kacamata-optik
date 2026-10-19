@@ -7,14 +7,14 @@ use App\Models\Customer;
 use App\Models\Frame;
 use App\Models\Lens;
 use App\Models\Payment;
-use App\Models\Prescription;
 use App\Models\Promotion;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
-use App\Models\TransactionUser;
+use App\Models\TransactionPrescription;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -27,7 +27,6 @@ class PosController extends Controller
         $lenses = Lens::with('category')->orderBy('name')->get();
         $accessories = Accessory::active()->with('category')->orderBy('name')->get();
         $promotions = Promotion::active()->orderBy('name')->get();
-        $prescriptions = Prescription::query()->latest('examination_date')->get();
 
         $frameItems = $frames->map(fn (Frame $frame) => [
             'type' => 'frame',
@@ -77,12 +76,7 @@ class PosController extends Controller
                     'id' => $promotion->id, 'name' => $promotion->name, 'type' => $promotion->promo_type,
                     'value' => (float) $promotion->discount_value, 'min' => (float) $promotion->min_spend,
                 ])->values(),
-                'rx' => $prescriptions->map(fn (Prescription $prescription) => [
-                    'id' => $prescription->id,
-                    'customer_id' => $prescription->customer_id,
-                    'doctor' => $prescription->doctor_or_optician,
-                    'date' => optional($prescription->examination_date)->format('d/m/Y'),
-                ])->values(),
+                'rx' => $this->savedPrescriptions(),
             ],
         ]);
     }
@@ -99,20 +93,21 @@ class PosController extends Controller
             'users.*.items.*.qty' => ['required', 'integer', 'min:1'],
             'users.*.ro1' => ['nullable', 'string', 'max:120'],
             'users.*.ro2' => ['nullable', 'string', 'max:120'],
-            'users.*.prescription_id' => ['nullable', 'integer', 'exists:prescriptions,id'],
+            'users.*.rx_ref' => ['nullable', 'string', 'max:60'],
+            'users.*.new_prescription' => ['nullable', 'boolean'],
             'items' => ['nullable', 'array', 'min:1'],
             'items.*.type' => ['required', 'in:frame,lens,accessory'],
             'items.*.id' => ['required', 'integer'],
             'items.*.qty' => ['required', 'integer', 'min:1'],
             'ro1' => ['nullable', 'string', 'max:120'],
             'ro2' => ['nullable', 'string', 'max:120'],
+            'rx_ref' => ['nullable', 'string', 'max:60'],
+            'new_prescription' => ['nullable', 'boolean'],
             'promo_id' => ['nullable', 'exists:promotions,id'],
             'payment_method' => ['required', 'in:cash,transfer,qris,card'],
             'payment_status' => ['required', 'in:paid,down_payment'],
             'dp_amount' => ['nullable', 'numeric', 'min:0'],
             'status' => ['required', 'in:ordered,processing,ready,completed'],
-            'prescription_id' => ['nullable', 'exists:prescriptions,id'],
-            'new_prescription' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -121,77 +116,71 @@ class PosController extends Controller
         }
 
         $groups = $this->resolveGroups($request, $data);
-        $inlinePrescriptions = $this->validatePrescriptions($request, $groups);
+        $prescriptions = $this->validatePrescriptions($request, $groups);
 
-        $transaction = DB::transaction(function () use ($request, $data, $groups, $inlinePrescriptions) {
+        $transaction = DB::transaction(function () use ($request, $data, $groups, $prescriptions) {
+            $sortno = 0;
+            $gross = 0.0;
             /** @var array<int, array<int, array<string, mixed>>> $linesByGroup */
             $linesByGroup = [];
+
             foreach ($groups as $index => $group) {
                 foreach ($group['items'] as $item) {
-                    $linesByGroup[$index][] = $this->resolveLine($item);
+                    $line = $this->resolveLine($item);
+                    $line['sortno'] = ++$sortno;
+                    $line['username'] = $group['name'];
+                    $linesByGroup[$index][] = $line;
+                    $gross += $line['price'] * $line['qty'];
                 }
             }
 
-            $subtotal = collect($linesByGroup)->flatten(1)
-                ->sum(fn (array $line) => $line['price'] * $line['quantity']);
-            [$promo, $discount] = $this->applyPromotion($data['promo_id'] ?? null, (float) $subtotal);
-            $total = max(0, $subtotal - $discount);
+            [$promo, $discount] = $this->applyPromotion($data['promo_id'] ?? null, $gross);
+            $discPercent = $gross > 0 ? round($discount / $gross * 100, 2) : 0.0;
 
-            $prescriptionIds = [];
-            foreach ($groups as $index => $group) {
-                $prescriptionIds[$index] = $group['prescription_id'] ?? null;
-
-                if (! $prescriptionIds[$index] && isset($inlinePrescriptions[$index])) {
-                    $inline = $inlinePrescriptions[$index] + [
-                        'customer_id' => (int) $data['customer_id'],
-                        'prescription_type' => ($inlinePrescriptions[$index]['prescription_type'] ?? null) ?: 'Distance',
-                    ];
-                    $inline['source'] = ($inline['source'] ?? null) ?: 'in_store';
-
-                    $prescriptionIds[$index] = Prescription::create($inline)->id;
+            $subtotal = 0.0;
+            foreach ($linesByGroup as $index => $lines) {
+                foreach ($lines as $position => $line) {
+                    $line['disc_percent'] = $discPercent;
+                    $line['subtotal'] = round($line['price'] * $line['qty'] * (1 - $discPercent / 100), 2);
+                    $linesByGroup[$index][$position] = $line;
+                    $subtotal += $line['subtotal'];
                 }
             }
 
             $transaction = Transaction::create([
-                'invoice_number' => $this->nextInvoiceNumber(),
-                'store_id' => $request->user()->store_id,
-                'staff_id' => $request->user()->id,
+                'sales_no' => $this->nextSalesNo(),
+                'sales_date' => now()->toDateString(),
+                'sales_time' => now()->format('H:i:s'),
                 'customer_id' => $data['customer_id'],
-                'prescription_id' => collect($prescriptionIds)->filter()->first(),
-                'subtotal' => $subtotal,
-                'discount_amount' => $discount,
-                'promo_id' => $promo?->id,
-                'total_amount' => $total,
-                'payment_status' => $data['payment_status'],
-                'payment_method' => $data['payment_method'],
-                'status' => $data['status'],
-                'notes' => $data['notes'] ?? null,
-                'transaction_date' => now(),
+                'input_by' => $request->user()->name,
+                'payment_by' => $data['payment_method'],
+                'edc_id' => null,
+                'grandtotal' => round($subtotal, 2),
+                'sales_notes' => $data['notes'] ?? null,
+                'sales_status' => $data['status'],
             ]);
 
-            foreach ($groups as $index => $group) {
-                $wearer = TransactionUser::create([
-                    'transaction_id' => $transaction->id,
-                    'name' => $group['name'],
-                    'prescription_id' => $prescriptionIds[$index] ?? null,
-                    'status' => 'ordered',
-                    'ro1' => $group['ro1'] ?? null,
-                    'ro2' => $group['ro2'] ?? null,
-                ]);
-
-                foreach ($linesByGroup[$index] as $line) {
+            foreach ($linesByGroup as $lines) {
+                foreach ($lines as $line) {
                     TransactionItem::create($line + [
-                        'transaction_id' => $transaction->id,
-                        'transaction_user_id' => $wearer->id,
+                        'sales_no' => $transaction->sales_no,
+                        'unit' => 'pcs',
+                        'keterangan' => null,
                     ]);
 
                     $this->decrementStock($line);
                 }
             }
 
+            foreach ($groups as $index => $group) {
+                if (isset($prescriptions[$index])) {
+                    $this->savePrescriptions($transaction, $linesByGroup[$index], $group, $prescriptions[$index]);
+                }
+            }
+
             Payment::create([
-                'transaction_id' => $transaction->id,
-                'amount' => $data['payment_status'] === 'paid' ? $total : (float) $data['dp_amount'],
+                'sales_no' => $transaction->sales_no,
+                'amount' => $data['payment_status'] === 'paid' ? (float) $transaction->grandtotal : (float) $data['dp_amount'],
                 'payment_method' => $data['payment_method'],
                 'paid_at' => now(),
                 'note' => $data['payment_status'] === 'paid' ? 'Pelunasan penuh.' : 'Uang muka (DP).',
@@ -201,7 +190,7 @@ class PosController extends Controller
         });
 
         return redirect()->route('transactions.show', $transaction)
-            ->with('success', "Transaksi {$transaction->invoice_number} berhasil dibuat.");
+            ->with('success', "Transaksi {$transaction->sales_no} berhasil dibuat.");
     }
 
     public function quickCustomer(Request $request): JsonResponse
@@ -225,12 +214,79 @@ class PosController extends Controller
     }
 
     /**
+     * Daftar resep lama (dari transaksi sebelumnya) untuk dipakai ulang di POS,
+     * lengkap dengan detail R/L sehingga bisa direview sebelum dipakai.
+     *
+     * @return Collection<int, array{ref: string, customer_id: int|string, doctor: ?string, type: ?string, source: ?string, date: ?string, od: array<string, mixed>, os: array<string, mixed>}>
+     */
+    private function savedPrescriptions(): Collection
+    {
+        return DB::table('transaction_prescriptions')
+            ->join('transactions', 'transactions.sales_no', '=', 'transaction_prescriptions.sales_no')
+            ->orderByDesc('transactions.sales_date')
+            ->get([
+                'transaction_prescriptions.sales_no as sales_no',
+                'transaction_prescriptions.sortno as sortno',
+                'transaction_prescriptions.sisi as sisi',
+                'transaction_prescriptions.resep as resep',
+                'transaction_prescriptions.jenis_lensa as jenis_lensa',
+                'transaction_prescriptions.source as source',
+                'transaction_prescriptions.itemno_lensa as itemno_lensa',
+                'transaction_prescriptions.qty as qty',
+                'transaction_prescriptions.sph as sph',
+                'transaction_prescriptions.cyl as cyl',
+                'transaction_prescriptions.axis as axis',
+                'transaction_prescriptions.add as add',
+                'transaction_prescriptions.pd as pd',
+                'transactions.customer_id as customer_id',
+                'transactions.sales_date as sales_date',
+            ])
+            ->groupBy(fn (object $row) => $row->sales_no.':'.$row->sortno)
+            ->map(function (Collection $rows) {
+                $first = $rows->first();
+
+                return [
+                    'ref' => $first->sales_no.':'.$first->sortno,
+                    'customer_id' => $first->customer_id,
+                    'doctor' => $first->resep,
+                    'type' => $first->jenis_lensa,
+                    'source' => $first->source,
+                    'date' => $first->sales_date ? (string) substr((string) $first->sales_date, 0, 10) : null,
+                    'od' => $this->rxSide($rows, TransactionPrescription::SIDES[0]),
+                    'os' => $this->rxSide($rows, TransactionPrescription::SIDES[1]),
+                ];
+            })
+            ->values();
+    }
+
+    /**
+     * Detail satu sisi resep tersimpan.
+     *
+     * @param  Collection<int, object>  $rows
+     * @return array{lens_id: ?string, qty: int, sph: ?string, cyl: ?string, axis: ?string, add: ?string, pd: ?string}
+     */
+    private function rxSide(Collection $rows, string $sisi): array
+    {
+        $row = $rows->firstWhere('sisi', $sisi);
+
+        return [
+            'lens_id' => $row?->itemno_lensa,
+            'qty' => (int) ($row->qty ?? 1),
+            'sph' => $row?->sph,
+            'cyl' => $row?->cyl,
+            'axis' => $row?->axis,
+            'add' => $row?->{'add'},
+            'pd' => $row?->pd,
+        ];
+    }
+
+    /**
      * Satu transaksi = satu customer/member, berisi satu atau beberapa pemakai
      * (mis. Ayah, Anak 1, Anak 2). Format lama `items[]` diperlakukan sebagai
      * satu pemakai bernama customer.
      *
      * @param  array<string, mixed>  $data
-     * @return array<int, array{name: string, items: array<int, array<string, mixed>>, prescription_id: ?int, new_prescription: bool, prescription: array<string, mixed>, ro1: ?string, ro2: ?string}>
+     * @return array<int, array{name: string, items: array<int, array<string, mixed>>, rx_ref: ?string, new_prescription: bool, prescription: array<string, mixed>, ro1: ?string, ro2: ?string}>
      */
     private function resolveGroups(Request $request, array $data): array
     {
@@ -241,7 +297,7 @@ class PosController extends Controller
                 $groups[$index] = [
                     'name' => trim($user['name']),
                     'items' => $user['items'],
-                    'prescription_id' => ! empty($user['prescription_id']) ? (int) $user['prescription_id'] : null,
+                    'rx_ref' => ! empty($user['rx_ref']) ? trim((string) $user['rx_ref']) : null,
                     'new_prescription' => $request->boolean("users.{$index}.new_prescription"),
                     'prescription' => $request->input("users.{$index}.prescription") ?? [],
                     'ro1' => $this->personName($user['ro1'] ?? null),
@@ -257,7 +313,7 @@ class PosController extends Controller
         return [[
             'name' => $customer->name,
             'items' => $data['items'],
-            'prescription_id' => ! empty($data['prescription_id']) ? (int) $data['prescription_id'] : null,
+            'rx_ref' => ! empty($data['rx_ref']) ? trim((string) $data['rx_ref']) : null,
             'new_prescription' => (bool) ($data['new_prescription'] ?? false),
             'prescription' => $request->input('prescription') ?? [],
             'ro1' => $this->personName($request->input('ro1')),
@@ -277,9 +333,9 @@ class PosController extends Controller
 
     /**
      * Validasi resep tiap pemakai: pemakai yang memilih lensa wajib punya resep
-     * (resep tersimpan atau input baru). Resep baru divalidasi per pemakai.
+     * (resep tersimpan dari transaksi lama atau input baru).
      *
-     * @param  array<int, array{name: string, items: array<int, array<string, mixed>>, prescription_id: ?int, new_prescription: bool, prescription: array<string, mixed>, ro1: ?string, ro2: ?string}>  $groups
+     * @param  array<int, array{name: string, items: array<int, array<string, mixed>>, rx_ref: ?string, new_prescription: bool, prescription: array<string, mixed>, ro1: ?string, ro2: ?string}>  $groups
      * @return array<int, array<string, mixed>>
      */
     private function validatePrescriptions(Request $request, array $groups): array
@@ -290,17 +346,19 @@ class PosController extends Controller
 
         foreach ($groups as $index => $group) {
             $hasLens = collect($group['items'])->contains('type', 'lens');
-            $useInline = (bool) $group['new_prescription'] || ! empty($group['prescription']);
+            $useNew = (bool) $group['new_prescription'] || ! empty($group['prescription']);
             $key = $isNewFormat ? "users.{$index}.prescription" : 'prescription';
 
-            if ($isNewFormat && $hasLens && ! $group['prescription_id'] && ! $useInline) {
-                $messages["users.{$index}.prescription_id"] = "Resep untuk pemakai \"{$group['name']}\" wajib diisi karena memilih lensa.";
+            if ($isNewFormat && $hasLens && ! $group['rx_ref'] && ! $useNew) {
+                $messages["users.{$index}.rx_ref"] = "Resep untuk pemakai \"{$group['name']}\" wajib diisi karena memilih lensa.";
 
                 continue;
             }
 
-            if ($useInline) {
+            if ($useNew) {
                 $payloads[$index] = $this->validateInlinePrescription($request, $key);
+            } elseif ($group['rx_ref']) {
+                $payloads[$index] = $this->resolveSavedPrescription($group['rx_ref'], $index, $isNewFormat, $messages);
             }
         }
 
@@ -312,15 +370,60 @@ class PosController extends Controller
     }
 
     /**
+     * Salin nilai resep lama (R/L) berdasreferensi "sales_no:sortno".
+     *
+     * @param  array<int, string>  $messages
+     * @return array<string, mixed>
+     */
+    private function resolveSavedPrescription(string $ref, int $index, bool $isNewFormat, array &$messages): array
+    {
+        [$salesNo, $sortno] = array_pad(explode(':', $ref, 2), 2, null);
+
+        $rows = TransactionPrescription::query()
+            ->where('sales_no', (string) $salesNo)
+            ->where('sortno', (int) $sortno)
+            ->get();
+
+        if ($rows->isEmpty()) {
+            $key = $isNewFormat ? "users.{$index}.rx_ref" : 'rx_ref';
+            $messages[$key] = 'Resep tersimpan tidak ditemukan. Pilih "Input resep baru".';
+
+            return [];
+        }
+
+        $right = $rows->firstWhere('sisi', TransactionPrescription::SIDES[0]);
+        $left = $rows->firstWhere('sisi', TransactionPrescription::SIDES[1]);
+        $first = $rows->first();
+
+        return [
+            'doctor_or_optician' => $first->resep,
+            'prescription_type' => $first->jenis_lensa,
+            'source' => $first->source,
+            'notes' => $first->ket,
+            'od_lens_id' => $right?->itemno_lensa,
+            'od_qty' => $right?->qty,
+            'os_lens_id' => $left?->itemno_lensa,
+            'os_qty' => $left?->qty,
+            'od_sph' => $right?->sph, 'od_cyl' => $right?->cyl, 'od_axis' => $right?->axis,
+            'od_add' => $right?->{'add'}, 'od_pd' => $right?->pd,
+            'os_sph' => $left?->sph, 'os_cyl' => $left?->cyl, 'os_axis' => $left?->axis,
+            'os_add' => $left?->{'add'}, 'os_pd' => $left?->pd,
+        ];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function validateInlinePrescription(Request $request, string $key): array
     {
         $validated = $request->validate([
             "{$key}.doctor_or_optician" => ['required', 'string', 'max:120'],
-            "{$key}.examination_date" => ['required', 'date'],
             "{$key}.prescription_type" => ['nullable', 'string', 'max:50'],
-            "{$key}.source" => ['nullable', 'in:'.implode(',', array_keys(Prescription::SOURCES))],
+            "{$key}.source" => ['nullable', 'in:'.implode(',', array_keys(TransactionPrescription::SOURCES))],
+            "{$key}.od_lens_id" => ['nullable', 'integer'],
+            "{$key}.od_qty" => ['nullable', 'integer', 'min:1'],
+            "{$key}.os_lens_id" => ['nullable', 'integer'],
+            "{$key}.os_qty" => ['nullable', 'integer', 'min:1'],
             "{$key}.od_sph" => ['nullable', 'string', 'max:10'],
             "{$key}.od_cyl" => ['nullable', 'string', 'max:10'],
             "{$key}.od_axis" => ['nullable', 'string', 'max:10'],
@@ -331,8 +434,6 @@ class PosController extends Controller
             "{$key}.os_axis" => ['nullable', 'string', 'max:10'],
             "{$key}.os_add" => ['nullable', 'string', 'max:10'],
             "{$key}.os_pd" => ['nullable', 'string', 'max:10'],
-            "{$key}.pd_total" => ['nullable', 'string', 'max:10'],
-            "{$key}.fitting_height" => ['nullable', 'string', 'max:10'],
             "{$key}.notes" => ['nullable', 'string', 'max:1000'],
         ]);
 
@@ -340,6 +441,57 @@ class PosController extends Controller
         $payload = data_get($validated, $key, []);
 
         return $payload;
+    }
+
+    /**
+     * Simpan resep R & L untuk satu kelompok pemakai. Tiap sisi menempel pada
+     * baris lensa milik sisi tersebut (item lensa & qty R/L bisa berbeda);
+     * bila tidak ada, jatuh ke baris lensa pertama / item pertama kelompok.
+     *
+     * @param  array<int, array<string, mixed>>  $lines
+     * @param  array{name: string, items: array<int, array<string, mixed>>, rx_ref: ?string, new_prescription: bool, prescription: array<string, mixed>, ro1: ?string, ro2: ?string}  $group
+     * @param  array<string, mixed>  $values
+     */
+    private function savePrescriptions(Transaction $transaction, array $lines, array $group, array $values): void
+    {
+        $lensLines = collect($lines)->where('item_type', 'lens')->keyBy('itemno');
+        $fallback = $lensLines->first() ?? ($lines[0] ?? null);
+
+        if (! $fallback) {
+            return;
+        }
+
+        foreach (TransactionPrescription::SIDES as $index => $side) {
+            $eye = $index === 0 ? 'od' : 'os';
+            $line = $lensLines->get((string) ($values["{$eye}_lens_id"] ?? '')) ?? $fallback;
+
+            TransactionPrescription::create([
+                'sales_no' => $transaction->sales_no,
+                'sortno' => $line['sortno'],
+                'itemno_lensa' => $line['item_type'] === 'lens' ? $line['itemno'] : null,
+                'item_type' => $line['item_type'],
+                'qty' => max(1, (int) ($values["{$eye}_qty"] ?? 1)),
+                'sisi' => $side,
+                'sph' => $this->blankToNull($values["{$eye}_sph"] ?? null),
+                'cyl' => $this->blankToNull($values["{$eye}_cyl"] ?? null),
+                'axis' => $this->blankToNull($values["{$eye}_axis"] ?? null),
+                'add' => $this->blankToNull($values["{$eye}_add"] ?? null),
+                'pd' => $this->blankToNull($values["{$eye}_pd"] ?? null),
+                'ro1' => $group['ro1'],
+                'ro2' => $group['ro2'],
+                'resep' => $this->blankToNull($values['doctor_or_optician'] ?? null),
+                'jenis_lensa' => $this->blankToNull($values['prescription_type'] ?? null),
+                'source' => $this->blankToNull($values['source'] ?? null),
+                'ket' => $this->blankToNull($values['notes'] ?? null),
+            ]);
+        }
+    }
+
+    private function blankToNull(mixed $value): ?string
+    {
+        $value = trim((string) $value);
+
+        return $value === '' ? null : $value;
     }
 
     /**
@@ -375,18 +527,12 @@ class PosController extends Controller
             throw ValidationException::withMessages(['items' => "Stok {$source['label']} {$model->name} tersisa {$model->stock}."]);
         }
 
-        $price = (float) $model->sell_price;
-
         return [
+            'itemno' => (string) $model->id,
             'item_type' => $type,
-            'frame_id' => $type === 'frame' ? $model->id : null,
-            'lens_id' => $type === 'lens' ? $model->id : null,
-            'accessory_id' => $type === 'accessory' ? $model->id : null,
-            'name' => $model->name,
-            'quantity' => $qty,
-            'price' => $price,
-            'discount' => 0,
-            'subtotal' => $price * $qty,
+            'item_description' => $model->name,
+            'price' => (float) $model->sell_price,
+            'qty' => $qty,
         ];
     }
 
@@ -395,19 +541,19 @@ class PosController extends Controller
      */
     private function decrementStock(array $line): void
     {
-        [$model, $column] = match ($line['item_type']) {
-            'frame' => [Frame::class, 'frame_id'],
-            'lens' => [Lens::class, 'lens_id'],
-            default => [Accessory::class, 'accessory_id'],
+        $model = match ($line['item_type']) {
+            'frame' => Frame::class,
+            'lens' => Lens::class,
+            default => Accessory::class,
         };
 
-        $model::whereKey($line[$column])->decrement('stock', $line['quantity']);
+        $model::whereKey($line['itemno'])->decrement('stock', $line['qty']);
     }
 
     /**
      * @return array{0: ?Promotion, 1: float}
      */
-    private function applyPromotion(?int $promoId, float $subtotal): array
+    private function applyPromotion(?int $promoId, float $gross): array
     {
         if (! $promoId) {
             return [null, 0];
@@ -415,25 +561,25 @@ class PosController extends Controller
 
         $promo = Promotion::active()->find($promoId);
 
-        if (! $promo || $subtotal < (float) $promo->min_spend) {
+        if (! $promo || $gross < (float) $promo->min_spend) {
             return [null, 0];
         }
 
         $discount = $promo->promo_type === 'nominal'
             ? (float) $promo->discount_value
-            : $subtotal * ((float) $promo->discount_value / 100);
+            : $gross * ((float) $promo->discount_value / 100);
 
-        return [$promo, min($subtotal, round($discount))];
+        return [$promo, min($gross, round($discount))];
     }
 
-    private function nextInvoiceNumber(): string
+    private function nextSalesNo(): string
     {
         $prefix = 'TRX-'.now()->format('Ymd').'-';
 
         $last = Transaction::query()
-            ->where('invoice_number', 'like', $prefix.'%')
-            ->orderByDesc('invoice_number')
-            ->value('invoice_number');
+            ->where('sales_no', 'like', $prefix.'%')
+            ->orderByDesc('sales_no')
+            ->value('sales_no');
 
         $seq = $last ? ((int) substr($last, -5)) + 1 : 1;
 

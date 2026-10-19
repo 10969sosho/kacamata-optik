@@ -6,16 +6,19 @@
 @push('scripts')
 <script>
 function pos() {
-    const RX_FIELDS = ['doctor_or_optician', 'examination_date', 'prescription_type',
+    const RX_FIELDS = ['doctor_or_optician', 'prescription_type', 'source',
+        'od_lens_id', 'od_qty', 'os_lens_id', 'os_qty',
         'od_sph', 'od_cyl', 'od_axis', 'od_add', 'od_pd',
         'os_sph', 'os_cyl', 'os_axis', 'os_add', 'os_pd',
-        'pd_total', 'fitting_height', 'notes'];
+        'notes'];
 
     return {
         customers: {!! json_encode($catalog['customers']) !!},
         items: {!! json_encode($catalog['items']) !!},
         promos: {!! json_encode($catalog['promos']) !!},
         rx: {!! json_encode($catalog['rx']) !!},
+        rxFields: RX_FIELDS,
+        rxModal: {},
         today: '{{ now()->toDateString() }}',
 
         customer_id: '{{ old('customer_id') }}',
@@ -33,6 +36,8 @@ function pos() {
         error: '',
 
         init() {
+            this.resetRx();
+
             const oldUsers = {!! json_encode(old('users') ?: []) !!};
 
             if (Array.isArray(oldUsers) && oldUsers.length) {
@@ -45,16 +50,178 @@ function pos() {
         fmt(n) { return 'Rp ' + new Intl.NumberFormat('id-ID').format(Math.round(n)); },
 
         rxDefaults() {
-            const rx = { prescription_type: '', notes: '', source: 'in_store' };
+            const rx = {};
             RX_FIELDS.forEach(f => rx[f] = '');
-            rx.examination_date = this.today;
             return rx;
+        },
+
+        blankEye() { return { lens: '', qty: 1, sph: '', cyl: '', axis: '', add: '', pd: '' }; },
+
+        resetRx() {
+            this.rxModal = {
+                open: false, ui: -1, mode: 'new', source: 'in_store',
+                od: this.blankEye(), os: this.blankEye(),
+                doctor: '', notes: '', ro1: '', ro2: '', ref: '', err: '',
+            };
+        },
+
+        sourceLabel(s) {
+            return { in_store: 'In Store', bring_own: 'Bawa Resep Sendiri' }[s] || '—';
+        },
+
+        /** Buka pop-up resep lensa untuk satu pemakai. */
+        openRx(index, presetLens) {
+            const u = this.users[index];
+            if (!u) return;
+
+            const lensLines = u.items.filter(li => li.type === 'lens');
+            const odLens = presetLens || u.rx.od_lens_id || lensLines[0]?.id || '';
+            const osLens = presetLens || u.rx.os_lens_id || lensLines[1]?.id || odLens;
+
+            this.rxModal = {
+                open: true,
+                ui: index,
+                mode: u.rx_ref ? 'existing' : 'new',
+                source: u.rx.source || 'in_store',
+                od: {
+                    lens: String(odLens || ''),
+                    qty: parseInt(u.rx.od_qty, 10) || 1,
+                    sph: u.rx.od_sph || '', cyl: u.rx.od_cyl || '', axis: u.rx.od_axis || '',
+                    add: u.rx.od_add || '', pd: u.rx.od_pd || '',
+                },
+                os: {
+                    lens: String(osLens || ''),
+                    qty: parseInt(u.rx.os_qty, 10) || 1,
+                    sph: u.rx.os_sph || '', cyl: u.rx.os_cyl || '', axis: u.rx.os_axis || '',
+                    add: u.rx.os_add || '', pd: u.rx.os_pd || '',
+                },
+                doctor: u.rx.doctor_or_optician || '',
+                notes: u.rx.notes || '',
+                ro1: u.ro1 || '', ro2: u.ro2 || '',
+                ref: u.rx_ref || '',
+                err: '',
+            };
+        },
+
+        lensOptions(index) {
+            const u = this.users[index];
+            if (!u) return this.items.filter(i => i.type === 'lens');
+
+            return this.items.filter(i => i.type === 'lens' && (this.inUserCart(u, i) || this.stockLeft(i) > 0));
+        },
+
+        get pickedRx() {
+            return this.rx.find(r => String(r.ref) === String(this.rxModal.ref)) || null;
+        },
+
+        eyeLabel(eye) { return eye === 'od' ? 'Mata Kanan (R)' : 'Mata Kiri (L)'; },
+
+        eyeSummary(eye) {
+            const e = this.rxModal[eye];
+            const item = e.lens ? this.catalogItem('lens', parseInt(e.lens, 10)) : null;
+            return (item ? item.name + ' × ' + e.qty + ' · ' : '') + (e.sph || ' plano');
+        },
+
+        /** Simpan resep baru: item lensa R & L masuk keranjang pemakai, modal tertutup. */
+        saveRx() {
+            const u = this.users[this.rxModal.ui];
+            if (!u) { this.rxModal.err = 'Pemakai tidak ditemukan.'; return; }
+
+            const err = this.validateRx();
+            if (err) { this.rxModal.err = err; return; }
+
+            const need = {};
+            ['od', 'os'].forEach(eye => {
+                const e = this.rxModal[eye];
+                if (e.lens) need[e.lens] = (need[e.lens] || 0) + (parseInt(e.qty, 10) || 1);
+            });
+
+            for (const [id, qty] of Object.entries(need)) {
+                const item = this.catalogItem('lens', parseInt(id, 10));
+                if (!item) { this.rxModal.err = 'Item lensa tidak ditemukan di katalog.'; return; }
+
+                const line = u.items.find(li => li.type === 'lens' && String(li.id) === String(id));
+                const cap = line ? this.stockFor(line) : this.stockLeft(item);
+                if (qty > cap) {
+                    this.rxModal.err = 'Stok ' + item.name + ' tersisa ' + cap + '. Sesuaikan qty resep.';
+                    return;
+                }
+            }
+
+            u.items = u.items.filter(li => li.type !== 'lens' || Object.prototype.hasOwnProperty.call(need, String(li.id)));
+            Object.entries(need).forEach(([id, qty]) => {
+                const item = this.catalogItem('lens', parseInt(id, 10));
+                const line = u.items.find(li => li.type === 'lens' && String(li.id) === String(id));
+                if (line) { line.qty = qty; return; }
+
+                u.items.push({
+                    type: item.type, id: item.id, name: item.name, category: item.category,
+                    price: item.price, stock: item.stock, qty: qty, _k: ++this.seq,
+                });
+            });
+
+            const m = this.rxModal;
+            u.rx = Object.assign(this.rxDefaults(), u.rx, {
+                doctor_or_optician: m.doctor.trim(),
+                source: m.source,
+                od_lens_id: m.od.lens, od_qty: parseInt(m.od.qty, 10) || 1,
+                os_lens_id: m.os.lens, os_qty: parseInt(m.os.qty, 10) || 1,
+                od_sph: m.od.sph, od_cyl: m.od.cyl, od_axis: m.od.axis, od_add: m.od.add, od_pd: m.od.pd,
+                os_sph: m.os.sph, os_cyl: m.os.cyl, os_axis: m.os.axis, os_add: m.os.add, os_pd: m.os.pd,
+                notes: m.notes,
+            });
+            u.ro1 = m.ro1.trim();
+            u.ro2 = m.ro2.trim();
+            u.rx_mode = 'new';
+            u.rx_ref = '';
+
+            this.resetRx();
+            this.error = '';
+        },
+
+        /** Pakai resep tersimpan: detail disalin ke pemakai, item lensa transaksi tetap pilihan admin. */
+        confirmSavedRx() {
+            const u = this.users[this.rxModal.ui];
+            const r = this.pickedRx;
+
+            if (!u) { this.rxModal.err = 'Pemakai tidak ditemukan.'; return; }
+            if (!r) { this.rxModal.err = 'Pilih salah satu resep tersimpan.'; return; }
+
+            u.rx = Object.assign(this.rxDefaults(), {
+                doctor_or_optician: r.doctor || '',
+                prescription_type: r.type || '',
+                source: r.source || '',
+                od_lens_id: r.od.lens_id || '', od_qty: r.od.qty || 1,
+                os_lens_id: r.os.lens_id || '', os_qty: r.os.qty || 1,
+                od_sph: r.od.sph || '', od_cyl: r.od.cyl || '', od_axis: r.od.axis || '',
+                od_add: r.od.add || '', od_pd: r.od.pd || '',
+                os_sph: r.os.sph || '', os_cyl: r.os.cyl || '', os_axis: r.os.axis || '',
+                os_add: r.os.add || '', os_pd: r.os.pd || '',
+            });
+            u.rx_ref = r.ref;
+            u.rx_mode = 'existing';
+
+            this.resetRx();
+            this.error = '';
+        },
+
+        validateRx() {
+            const m = this.rxModal;
+            const u = this.users[m.ui];
+
+            if (!m.doctor.trim()) return 'Nama dokter / optometris resep wajib diisi.';
+            if (!m.od.lens && !m.os.lens) return 'Pilih item lensa minimal untuk satu mata.';
+            if ((parseInt(m.od.qty, 10) || 0) < 1 || (parseInt(m.os.qty, 10) || 0) < 1) {
+                if (m.od.lens && (parseInt(m.od.qty, 10) || 0) < 1) return 'Qty mata kanan minimal 1.';
+                if (m.os.lens && (parseInt(m.os.qty, 10) || 0) < 1) return 'Qty mata kiri minimal 1.';
+            }
+            if (!u) return 'Pemakai tidak ditemukan.';
+            return '';
         },
 
         makeUser(name, snapshot) {
             const snap = snapshot || {};
             const rx = Object.assign(this.rxDefaults(), snap.prescription || {});
-            if (!rx.examination_date) rx.examination_date = this.today;
 
             const lines = (Array.isArray(snap.items) ? snap.items : [])
                 .map(old => this.catalogItem(old.type, parseInt(old.id, 10)))
@@ -71,8 +238,8 @@ function pos() {
                 name: name || '',
                 q: '', cat: '',
                 items: lines,
-                rx_mode: snap.prescription_id ? 'existing' : 'new',
-                prescription_id: snap.prescription_id || '',
+                rx_mode: snap.rx_ref ? 'existing' : 'new',
+                rx_ref: snap.rx_ref || '',
                 rx: rx,
                 ro1: snap.ro1 || '',
                 ro2: snap.ro2 || '',
@@ -99,8 +266,8 @@ function pos() {
         get categories() { return [...new Set(this.items.map(i => i.category))]; },
 
         filteredCustomers() {
-            const q = this.custQ.toLowerCase();
-            return this.customers.filter(c => !q || c.name.toLowerCase().includes(q) || c.phone.includes(q) || c.member_id.toLowerCase().includes(q));
+            const q = (this.custQ || '').toLowerCase();
+            return this.customers.filter(c => !q || (c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q) || (c.member_id || '').toLowerCase().includes(q));
         },
 
         stockLeft(item) {
@@ -124,6 +291,14 @@ function pos() {
 
         addItem(index, item) {
             const user = this.users[index];
+            if (!user) return;
+
+            // Jika item kategori Lensa dipilih, langsung tampilkan pop-up resep lensa
+            if (item.type === 'lens' || (item.category || '').toLowerCase() === 'lensa') {
+                this.openRx(index, item.id);
+                return;
+            }
+
             const found = user.items.find(li => li.type === item.type && li.id === item.id);
             if (found) { this.bumpQty(index, user.items.indexOf(found), 1); return; }
 
@@ -133,7 +308,7 @@ function pos() {
                 type: item.type, id: item.id, name: item.name, category: item.category,
                 price: item.price, stock: item.stock, qty: 1, _k: ++this.seq,
             });
-            if (this.hasLens(user) && !user.prescription_id) user.rx_mode = 'new';
+            if (this.hasLens(user) && !user.rx_ref) user.rx_mode = 'new';
         },
         removeItem(index, lineIndex) { this.users[index].items.splice(lineIndex, 1); },
         bumpQty(index, lineIndex, delta) {
@@ -204,8 +379,8 @@ function pos() {
                 if (!u.name.trim()) return 'Nama pemakai ke-' + (i + 1) + ' wajib diisi.';
                 if (!u.items.length) return label + ' belum memilih item.';
                 if (this.needsRx(u)) {
-                    if (u.rx_mode === 'existing' && !u.prescription_id) return 'Pilih resep tersimpan untuk ' + label + '.';
-                    if (u.rx_mode === 'new' && !u.rx.doctor_or_optician) return 'Isi dokter / optometris pada resep ' + label + '.';
+                    if (u.rx_mode === 'existing' && !u.rx_ref) return 'Pilih resep tersimpan untuk ' + label + '.';
+                    if (u.rx_mode === 'new' && !u.rx.doctor_or_optician) return 'Lengkapi resep lensa untuk ' + label + ' (klik "Tambah Resep Lensa").';
                 }
             }
             if (this.payment_status === 'down_payment' && !(parseFloat(this.dp_amount) > 0)) return 'Nominal DP wajib diisi.';
@@ -298,19 +473,14 @@ function pos() {
                                             class="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50">Hapus</button>
                                 </div>
 
-                                <!-- petugas: RO1 periksa mata, RO2 potong lensa -->
-                                <div class="mb-3 grid gap-2 sm:grid-cols-2">
-                                    <label class="block">
-                                        <span class="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">RO1 · Periksa Mata</span>
-                                        <input type="text" :name="`users[${ui}][ro1]`" x-model="u.ro1" maxlength="120" placeholder="Nama petugas refraksi"
-                                               class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:border-red-500 focus:outline-none">
-                                    </label>
-                                    <label class="block">
-                                        <span class="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">RO2 · Potong Lensa</span>
-                                        <input type="text" :name="`users[${ui}][ro2]`" x-model="u.ro2" maxlength="120" placeholder="Nama petugas lensa"
-                                               class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:border-red-500 focus:outline-none">
-                                    </label>
-                                </div>
+                                <!-- petugas: RO1 periksa mata, RO2 potong lensa (diisi lewat pop-up resep) -->
+                                <input type="hidden" :name="`users[${ui}][ro1]`" :value="u.ro1">
+                                <input type="hidden" :name="`users[${ui}][ro2]`" :value="u.ro2">
+                                <p x-show="u.ro1 || u.ro2" class="mb-3 text-[11px] font-semibold text-slate-500">
+                                    RO1: <span class="text-slate-700" x-text="u.ro1 || '-'"></span>
+                                    <span class="mx-2 text-slate-300">·</span>
+                                    RO2: <span class="text-slate-700" x-text="u.ro2 || '-'"></span>
+                                </p>
 
                                 <!-- pemilihan item -->
                                 <p class="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Pilih item untuk pemakai ini</p>
@@ -373,91 +543,46 @@ function pos() {
                                     <p x-show="!u.items.length" class="rounded-xl bg-white px-3 py-3 text-center text-xs text-slate-400">Belum ada item dipilih.</p>
                                 </div>
 
-                                <!-- resep muncul ketika lensa dipilih -->
+                                <!-- status resep pemakai — diisi lewat pop-up Resep Lensa -->
                                 <template x-if="hasLens(u)">
                                     <div class="mt-3 rounded-xl border border-red-100 bg-white p-4">
-                                    <p class="mb-2 text-[11px] font-bold uppercase tracking-wider text-red-600">
-                                        Resep · <span x-text="u.name || ('Pemakai ' + (ui + 1))"></span>
-                                    </p>
-
-                                    <div class="flex flex-wrap gap-3 text-xs">
-                                        <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
-                                            <input type="radio" value="new" x-model="u.rx_mode" :name="`rx_mode_${ui}`" class="text-red-500 focus:ring-red-500/30"> Input resep baru
-                                        </label>
-                                        <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
-                                            <input type="radio" value="existing" x-model="u.rx_mode" :name="`rx_mode_${ui}`" class="text-red-500 focus:ring-red-500/30"> Pakai resep tersimpan
-                                        </label>
-                                    </div>
-
-                                    <template x-if="u.rx_mode === 'new'">
-                                        <div class="mt-3">
-                                            <p class="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">Sumber resep</p>
-                                            <div class="flex flex-wrap gap-3 text-xs">
-                                                <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
-                                                    <input type="radio" value="in_store" x-model="u.rx.source" :name="`users[${ui}][prescription][source]`" class="text-red-500 focus:ring-red-500/30"> In Store (periksa di toko)
-                                                </label>
-                                                <label class="flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-2">
-                                                    <input type="radio" value="bring_own" x-model="u.rx.source" :name="`users[${ui}][prescription][source]`" class="text-red-500 focus:ring-red-500/30"> Bawa resep sendiri
-                                                </label>
-                                            </div>
-                                        </div>
-                                    </template>
-
-                                    <template x-if="u.rx_mode === 'existing'">
-                                        <div class="mt-3">
-                                            <select x-show="custRx(u).length" x-model="u.prescription_id"
-                                                    class="w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
-                                                <option value="">— Pilih resep —</option>
-                                                <template x-for="r in custRx(u)" :key="r.id">
-                                                    <option :value="r.id" x-text="r.doctor + ' · ' + r.date" :selected="String(r.id) === String(u.prescription_id)"></option>
-                                                </template>
-                                            </select>
-                                            <p x-show="!custRx(u).length" class="rounded-xl bg-slate-50 px-3 py-3 text-xs text-slate-500">
-                                                Customer ini belum punya resep — pilih "Input resep baru".
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <p class="text-[11px] font-bold uppercase tracking-wider text-red-600">
+                                                Resep · <span x-text="u.name || ('Pemakai ' + (ui + 1))"></span>
                                             </p>
+                                            <button type="button" @click="openRx(ui)"
+                                                    class="rounded-lg bg-red-600 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-red-700"
+                                                    x-text="(u.rx_ref || u.rx.doctor_or_optician) ? 'Ubah Resep Lensa' : '+ Tambah Resep Lensa'"></button>
                                         </div>
-                                    </template>
 
-                                    <template x-if="u.rx_mode === 'new'">
-                                        <div class="mt-3 space-y-3 rounded-xl border border-slate-100 bg-slate-50 p-3">
-                                        <div class="grid gap-3 sm:grid-cols-3">
-                                            <input :name="`users[${ui}][prescription][doctor_or_optician]`" x-model="u.rx.doctor_or_optician" placeholder="Dokter / Optometris *"
-                                                   class="rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-red-500 focus:outline-none">
-                                            <input :name="`users[${ui}][prescription][examination_date]`" x-model="u.rx.examination_date" type="date"
-                                                   class="rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-red-500 focus:outline-none">
-                                            <input :name="`users[${ui}][prescription][prescription_type]`" x-model="u.rx.prescription_type" placeholder="Tipe resep"
-                                                   class="rounded-xl border border-slate-200 px-3 py-2 text-xs focus:border-red-500 focus:outline-none">
-                                        </div>
-                                        <div class="grid gap-3 sm:grid-cols-2">
-                                            <template x-for="eye in ['od', 'os']" :key="eye">
-                                                <div>
-                                                    <p class="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500" x-text="eye === 'od' ? 'OD Kanan' : 'OS Kiri'"></p>
-                                                    <div class="grid grid-cols-3 gap-1.5">
-                                                        <template x-for="part in ['sph', 'cyl', 'axis', 'add', 'pd']" :key="eye + part">
-                                                            <input :name="`users[${ui}][prescription][${eye}_${part}]`" x-model="u.rx[eye + '_' + part]"
-                                                                   :placeholder="part.toUpperCase()"
-                                                                   class="rounded-lg border border-slate-200 px-2 py-1.5 text-[11px] focus:border-red-500 focus:outline-none">
-                                                        </template>
-                                                    </div>
-                                                </div>
-                                            </template>
-                                        </div>
-                                        <div class="grid gap-3 sm:grid-cols-3">
-                                            <input :name="`users[${ui}][prescription][pd_total]`" x-model="u.rx.pd_total" placeholder="PD Total"
-                                                   class="rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-red-500 focus:outline-none">
-                                            <input :name="`users[${ui}][prescription][fitting_height]`" x-model="u.rx.fitting_height" placeholder="Fitting Height"
-                                                   class="rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-red-500 focus:outline-none">
-                                            <input :name="`users[${ui}][prescription][notes]`" x-model="u.rx.notes" placeholder="Catatan resep"
-                                                   class="rounded-lg border border-slate-200 px-3 py-2 text-xs focus:border-red-500 focus:outline-none">
-                                        </div>
-                                            </div>
-                                        </template>
+                                        <p x-show="!u.rx.doctor_or_optician" class="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-700">
+                                            Resep lensa belum diisi — klik tombol di atas (wajib karena memilih lensa).
+                                        </p>
 
+                                        <div x-show="u.rx.doctor_or_optician" class="mt-2 space-y-1 text-[11px] text-slate-600">
+                                            <p>
+                                                <span class="font-bold text-slate-800" x-text="u.rx.doctor_or_optician"></span>
+                                                <span class="ml-1 text-slate-400" x-text="u.rx_ref ? '· resep tersimpan' : '· resep baru'"></span>
+                                            </p>
+                                            <p class="font-mono">
+                                                R: <span x-text="(u.rx.od_lens_id ? (catalogItem('lens', parseInt(u.rx.od_lens_id, 10))?.name || '') + ' × ' + (u.rx.od_qty || 1) + ' · ' : '') + (u.rx.od_sph || 'plano')"></span>
+                                                <span class="mx-1 text-slate-300">|</span>
+                                                L: <span x-text="(u.rx.os_lens_id ? (catalogItem('lens', parseInt(u.rx.os_lens_id, 10))?.name || '') + ' × ' + (u.rx.os_qty || 1) + ' · ' : '') + (u.rx.os_sph || 'plano')"></span>
+                                            </p>
+                                            <p class="text-slate-500">Sumber: <span x-text="sourceLabel(u.rx.source)"></span></p>
+                                        </div>
+
+                                        <!-- detail resep ikut terkirim saat form disubmit -->
                                         <template x-if="u.rx_mode === 'existing'">
-                                            <input type="hidden" :name="`users[${ui}][prescription_id]`" :value="u.prescription_id">
+                                            <input type="hidden" :name="`users[${ui}][rx_ref]`" :value="u.rx_ref">
                                         </template>
                                         <template x-if="u.rx_mode === 'new'">
-                                            <input type="hidden" :name="`users[${ui}][new_prescription]`" value="1">
+                                            <span>
+                                                <input type="hidden" :name="`users[${ui}][new_prescription]`" value="1">
+                                                <template x-for="f in rxFields" :key="'rx-' + f">
+                                                    <input type="hidden" :name="`users[${ui}][prescription][${f}]`" :value="u.rx[f]">
+                                                </template>
+                                            </span>
                                         </template>
                                     </div>
                                 </template>
@@ -493,7 +618,7 @@ function pos() {
                                             <p class="truncate text-xs font-semibold text-slate-900" x-text="li.name"></p>
                                             <p class="text-[11px] text-slate-500">
                                                 <span x-text="li.qty + ' × ' + fmt(li.price)"></span>
-                                                <span class="text-red-600" x-show="li.type === 'lens'"> · resep: <span x-text="u.rx_mode === 'existing' ? 'tersimpan' : (u.rx.source === 'bring_own' ? 'bawa resep sendiri' : 'in store')"></span></span>
+                                                <span class="text-red-600" x-show="li.type === 'lens'"> · resep: <span x-text="u.rx_mode === 'existing' ? 'tersimpan' : 'baru'"></span></span>
                                             </p>
                                         </div>
                                         <span class="flex shrink-0 items-center gap-1.5">
@@ -581,6 +706,194 @@ function pos() {
                     </div>
                 </div>
             </aside>
+        </div>
+
+        <!-- Pop-up Resep Lensa -->
+        <div x-show="rxModal.open" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4"
+             @keydown.escape.window="rxModal.open = false" role="dialog" aria-modal="true" aria-label="Resep Lensa">
+            <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" @click="rxModal.open = false"></div>
+
+            <div class="relative flex max-h-[92vh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+                <div class="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4">
+                    <div>
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-red-600">Resep Lensa</p>
+                        <h3 class="text-base font-extrabold text-slate-900"
+                            x-text="'Pemakai: ' + (users[rxModal.ui]?.name || ('Pemakai ' + ((rxModal.ui || 0) + 1)))"></h3>
+                    </div>
+                    <button type="button" @click="rxModal.open = false" title="Tutup"
+                            class="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-slate-200 text-sm text-slate-500 hover:bg-slate-50">✕</button>
+                </div>
+
+                <div class="flex gap-1 border-b border-slate-100 px-5 pt-2">
+                    <button type="button" @click="rxModal.mode = 'new'; rxModal.err = ''"
+                            class="border-b-2 px-4 py-2.5 text-xs font-bold transition"
+                            :class="rxModal.mode === 'new' ? 'border-red-600 text-red-700' : 'border-transparent text-slate-400 hover:text-slate-600'">
+                        Input Resep Baru
+                    </button>
+                    <button type="button" @click="rxModal.mode = 'existing'; rxModal.err = ''"
+                            class="border-b-2 px-4 py-2.5 text-xs font-bold transition"
+                            :class="rxModal.mode === 'existing' ? 'border-red-600 text-red-700' : 'border-transparent text-slate-400 hover:text-slate-600'">
+                        Pakai Resep Tersimpan
+                    </button>
+                </div>
+
+                <div class="flex-1 overflow-y-auto px-5 py-4">
+                    <div x-show="rxModal.err" x-cloak
+                         class="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-2.5 text-xs font-semibold text-rose-700"
+                         x-text="rxModal.err"></div>
+
+                    <!-- A · Input resep baru -->
+                    <div x-show="rxModal.mode === 'new'" class="space-y-4">
+                        <div>
+                            <p class="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Sumber Resep</p>
+                            <div class="grid gap-2 sm:grid-cols-2">
+                                <label class="flex cursor-pointer items-start gap-2.5 rounded-xl border px-3.5 py-3 transition"
+                                       :class="rxModal.source === 'in_store' ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300'">
+                                    <input type="radio" value="in_store" x-model="rxModal.source" class="mt-0.5 text-red-600 focus:ring-red-500/30">
+                                    <span>
+                                        <span class="block text-xs font-bold text-slate-900">In Store</span>
+                                        <span class="block text-[11px] text-slate-500">Pemeriksaan mata di toko</span>
+                                    </span>
+                                </label>
+                                <label class="flex cursor-pointer items-start gap-2.5 rounded-xl border px-3.5 py-3 transition"
+                                       :class="rxModal.source === 'bring_own' ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300'">
+                                    <input type="radio" value="bring_own" x-model="rxModal.source" class="mt-0.5 text-red-600 focus:ring-red-500/30">
+                                    <span>
+                                        <span class="block text-xs font-bold text-slate-900">Bawa Resep Sendiri</span>
+                                        <span class="block text-[11px] text-slate-500">Resep luar / dokter customer</span>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-3 lg:grid-cols-2">
+                            <template x-for="eye in ['od', 'os']" :key="'box-' + eye">
+                                <div class="rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5">
+                                    <p class="mb-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-600" x-text="eyeLabel(eye)"></p>
+
+                                    <div class="mb-2.5 grid gap-2 sm:grid-cols-[1fr_76px]">
+                                        <label class="block min-w-0">
+                                            <span class="mb-1 block text-[10px] font-semibold text-slate-500">Item Lensa</span>
+                                            <select x-model="rxModal[eye].lens"
+                                                    class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20">
+                                                <option value="">— Pilih lensa —</option>
+                                                <template x-for="it in lensOptions(rxModal.ui)" :key="'opt-' + eye + '-' + it.id">
+                                                    <option :value="String(it.id)" x-text="it.name + ' (sisa ' + stockLeft(it) + ')'"></option>
+                                                </template>
+                                            </select>
+                                        </label>
+                                        <label class="block">
+                                            <span class="mb-1 block text-[10px] font-semibold text-slate-500">Qty</span>
+                                            <input type="number" min="1" step="1" x-model.number="rxModal[eye].qty"
+                                                   class="w-full rounded-xl border border-slate-200 bg-white px-2 py-2 text-center text-xs font-bold focus:border-red-500 focus:outline-none">
+                                        </label>
+                                    </div>
+
+                                    <div class="grid grid-cols-3 gap-1.5 sm:grid-cols-5">
+                                        <template x-for="part in ['sph', 'cyl', 'axis', 'add', 'pd']" :key="eye + '-' + part">
+                                            <label class="block">
+                                                <span class="mb-1 block text-center text-[9px] font-bold uppercase tracking-wider text-slate-400" x-text="part.toUpperCase()"></span>
+                                                <input x-model="rxModal[eye][part]" type="text" :placeholder="part.toUpperCase()"
+                                                       class="w-full rounded-lg border border-slate-200 bg-white px-1.5 py-2 text-center font-mono text-xs focus:border-red-500 focus:outline-none">
+                                            </label>
+                                        </template>
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <label class="block">
+                                <span class="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">Dokter / Optometris *</span>
+                                <input x-model="rxModal.doctor" type="text" maxlength="120" placeholder="Nama pembuat resep"
+                                       class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20">
+                            </label>
+                            <label class="block">
+                                <span class="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">Catatan Resep</span>
+                                <input x-model="rxModal.notes" type="text" maxlength="1000" placeholder="Catatan (opsional)"
+                                       class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20">
+                            </label>
+                        </div>
+
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <label class="block">
+                                <span class="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">RO1 · Periksa Mata</span>
+                                <input x-model="rxModal.ro1" type="text" maxlength="120" placeholder="Nama pegawai refraksionis"
+                                       class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20">
+                            </label>
+                            <label class="block">
+                                <span class="mb-1 block text-[11px] font-bold uppercase tracking-wider text-slate-500">RO2 · Pendamping / Kasir</span>
+                                <input x-model="rxModal.ro2" type="text" maxlength="120" placeholder="Nama pegawai RO pendamping"
+                                       class="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 text-sm focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20">
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- B · Pakai resep tersimpan -->
+                    <div x-show="rxModal.mode === 'existing'" class="space-y-3">
+                        <p class="text-[11px] font-bold uppercase tracking-wider text-slate-500">Resep tersimpan milik member ini</p>
+
+                        <div class="space-y-2">
+                            <template x-for="r in custRx(users[rxModal.ui])" :key="'rx-' + r.ref">
+                                <button type="button" @click="rxModal.ref = r.ref; rxModal.err = ''"
+                                        class="flex w-full items-center justify-between gap-3 rounded-xl border px-3.5 py-3 text-left transition"
+                                        :class="String(rxModal.ref) === String(r.ref) ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300'">
+                                    <span class="min-w-0">
+                                        <span class="block truncate text-xs font-bold text-slate-900" x-text="r.doctor || 'Resep'"></span>
+                                        <span class="block truncate text-[11px] text-slate-500" x-text="(r.date || '-') + ' · ' + sourceLabel(r.source) + (r.type ? ' · ' + r.type : '')"></span>
+                                    </span>
+                                    <span class="shrink-0 font-mono text-[11px] font-bold text-slate-600"
+                                          x-text="'R ' + (r.od.sph || 'plano') + ' / L ' + (r.os.sph || 'plano')"></span>
+                                </button>
+                            </template>
+                        </div>
+
+                        <p x-show="!custRx(users[rxModal.ui]).length" class="rounded-xl bg-slate-50 px-4 py-4 text-center text-xs text-slate-500">
+                            Customer ini belum punya resep — gunakan tab "Input Resep Baru".
+                        </p>
+
+                        <div x-show="pickedRx" x-cloak class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                            <div class="mb-2 flex items-center justify-between gap-2">
+                                <p class="text-[11px] font-bold uppercase tracking-wider text-slate-600">Detail Resep — periksa kembali</p>
+                                <span class="shrink-0 rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600" x-text="sourceLabel(pickedRx?.source)"></span>
+                            </div>
+                            <p class="mb-3 text-xs font-semibold text-slate-800"
+                               x-text="(pickedRx?.doctor || '-') + (pickedRx?.date ? ' · ' + pickedRx.date : '')"></p>
+
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <template x-for="side in [{ eye: 'od', label: 'Mata Kanan (R)', data: pickedRx?.od }, { eye: 'os', label: 'Mata Kiri (L)', data: pickedRx?.os }]"
+                                          :key="'side-' + side.eye">
+                                    <div class="rounded-xl border border-slate-200 bg-white p-3">
+                                        <p class="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500" x-text="side.label"></p>
+                                        <div class="grid grid-cols-2 gap-y-1 text-[11px]">
+                                            <template x-for="p in ['sph', 'cyl', 'axis', 'add', 'pd']" :key="side.eye + p">
+                                                <span class="contents">
+                                                    <span class="text-slate-500" x-text="p.toUpperCase()"></span>
+                                                    <span class="text-right font-mono font-bold text-slate-900" x-text="side.data?.[p] || '—'"></span>
+                                                </span>
+                                            </template>
+                                        </div>
+                                        <p class="mt-2 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
+                                            Lensa:
+                                            <span class="font-semibold text-slate-700"
+                                                  x-text="(catalogItem('lens', parseInt(side.data?.lens_id, 10))?.name || '—') + ' × ' + (side.data?.qty || 1)"></span>
+                                        </p>
+                                    </div>
+                                </template>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap justify-end gap-2 border-t border-slate-100 bg-slate-50 px-5 py-3.5">
+                    <button type="button" @click="rxModal.open = false"
+                            class="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50">Batal</button>
+                    <button type="button" x-show="rxModal.mode === 'new'" @click="saveRx()"
+                            class="rounded-xl bg-red-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-red-700">Simpan Resep</button>
+                    <button type="button" x-show="rxModal.mode === 'existing'" @click="confirmSavedRx()"
+                            class="rounded-xl bg-red-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-red-700">Pakai Resep Ini</button>
+                </div>
+            </div>
         </div>
     </form>
 @endsection

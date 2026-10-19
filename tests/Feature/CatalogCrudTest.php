@@ -5,7 +5,6 @@ namespace Tests\Feature;
 use App\Models\Customer;
 use App\Models\Frame;
 use App\Models\Lens;
-use App\Models\Prescription;
 use App\Models\ProductCategory;
 use App\Models\Promotion;
 use App\Models\Transaction;
@@ -140,61 +139,6 @@ class CatalogCrudTest extends TestCase
         $this->assertSame('Maya A.', $customer->fresh()->name);
     }
 
-    public function test_prescription_create_and_show(): void
-    {
-        $customer = Customer::create([
-            'member_id' => 'KCM-000020', 'name' => 'Siti', 'phone' => '081666666666',
-            'status' => 'active', 'registered_at' => now()->toDateString(),
-        ]);
-
-        $this->actingAs($this->admin)->post(route('prescriptions.store'), [
-            'customer_id' => $customer->id,
-            'doctor_or_optician' => 'Optometris Dian',
-            'examination_date' => now()->toDateString(),
-            'prescription_type' => 'Distance',
-            'source' => 'bring_own',
-            'od_sph' => '-1.25', 'od_cyl' => '-0.50', 'od_axis' => '90',
-            'os_sph' => '-1.00', 'pd_total' => '63',
-        ])->assertRedirect();
-
-        $rx = Prescription::firstOrFail();
-
-        $this->assertSame('bring_own', $rx->source);
-        $this->assertSame('Bawa Resep Sendiri', $rx->sourceLabel());
-
-        $this->actingAs($this->admin)->get(route('prescriptions.show', $rx))
-            ->assertOk()
-            ->assertSee('Optometris Dian')
-            ->assertSee('Bawa Resep Sendiri')
-            ->assertSee('-1.25');
-    }
-
-    public function test_prescription_source_defaults_to_in_store(): void
-    {
-        $customer = Customer::create([
-            'member_id' => 'KCM-000021', 'name' => 'Rudi', 'phone' => '081666666667',
-            'status' => 'active', 'registered_at' => now()->toDateString(),
-        ]);
-
-        $this->actingAs($this->admin)->post(route('prescriptions.store'), [
-            'customer_id' => $customer->id,
-            'doctor_or_optician' => 'Dr. Robert Sp.M',
-            'examination_date' => now()->toDateString(),
-        ])->assertRedirect();
-
-        $rx = Prescription::firstOrFail();
-
-        $this->assertSame('in_store', $rx->source);
-        $this->assertSame('In Store', $rx->sourceLabel());
-
-        $this->actingAs($this->admin)->post(route('prescriptions.store'), [
-            'customer_id' => $customer->id,
-            'doctor_or_optician' => 'Dr. Robert Sp.M',
-            'examination_date' => now()->toDateString(),
-            'source' => 'di_kantor',
-        ])->assertSessionHasErrors('source');
-    }
-
     public function test_promotion_crud_flow(): void
     {
         $this->actingAs($this->admin)->post(route('promotions.store'), [
@@ -226,11 +170,14 @@ class CatalogCrudTest extends TestCase
         ]);
 
         Transaction::create([
-            'invoice_number' => 'TRX-20260926-00002', 'customer_id' => $customer->id,
-            'staff_id' => $this->admin->id,
-            'subtotal' => 2000000, 'discount_amount' => 200000, 'total_amount' => 1800000,
-            'payment_status' => 'paid', 'payment_method' => 'cash',
-            'status' => 'completed', 'transaction_date' => now(),
+            'sales_no' => 'TRX-20260926-00002',
+            'sales_date' => now()->toDateString(),
+            'sales_time' => '10:00:00',
+            'customer_id' => $customer->id,
+            'input_by' => $this->admin->name,
+            'payment_by' => 'cash',
+            'grandtotal' => 1800000,
+            'sales_status' => 'completed',
         ]);
 
         $this->actingAs($this->admin)->get(route('reports.index'))
@@ -247,7 +194,7 @@ class CatalogCrudTest extends TestCase
 
     public function test_pagination_and_listing_pages_render(): void
     {
-        foreach (['frames.index', 'lenses.index', 'categories.index', 'customers.index', 'prescriptions.index', 'transactions.index', 'promotions.index', 'reports.index'] as $route) {
+        foreach (['frames.index', 'lenses.index', 'categories.index', 'customers.index', 'transactions.index', 'promotions.index', 'reports.index'] as $route) {
             $this->actingAs($this->admin)->get(route($route))->assertOk();
         }
     }

@@ -87,7 +87,7 @@
                 <table class="w-full text-left text-sm">
                     <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
                         <tr>
-                            <th class="px-5 py-3">Invoice</th>
+                            <th class="px-5 py-3">No. Sales</th>
                             <th class="px-5 py-3">Customer</th>
                             <th class="px-5 py-3">Kasir</th>
                             <th class="px-5 py-3 text-right">Total</th>
@@ -98,13 +98,13 @@
                         @forelse ($recentTransactions as $trx)
                             <tr class="hover:bg-slate-50">
                                 <td class="px-5 py-3 font-semibold text-slate-900">
-                                    <a href="{{ route('transactions.show', $trx) }}" class="hover:text-red-600">{{ $trx->invoice_number }}</a>
+                                    <a href="{{ route('transactions.show', $trx) }}" class="hover:text-red-600">{{ $trx->sales_no }}</a>
                                 </td>
                                 <td class="px-5 py-3 text-slate-600">{{ $trx->customer?->name ?? '-' }}</td>
-                                <td class="px-5 py-3 text-slate-600">{{ $trx->staff?->name ?? '-' }}</td>
-                                <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($trx->total_amount)</td>
+                                <td class="px-5 py-3 text-slate-600">{{ $trx->input_by }}</td>
+                                <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($trx->grandtotal)</td>
                                 <td class="px-5 py-3">
-                                    <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold capitalize text-slate-600">{{ $trx->status }}</span>
+                                    <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold capitalize text-slate-600">{{ $trx->sales_status }}</span>
                                 </td>
                             </tr>
                         @empty

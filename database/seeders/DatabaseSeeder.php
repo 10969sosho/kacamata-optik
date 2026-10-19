@@ -7,13 +7,12 @@ use App\Models\Customer;
 use App\Models\Frame;
 use App\Models\Lens;
 use App\Models\Payment;
-use App\Models\Prescription;
 use App\Models\ProductCategory;
 use App\Models\Promotion;
 use App\Models\Store;
 use App\Models\Transaction;
 use App\Models\TransactionItem;
-use App\Models\TransactionUser;
+use App\Models\TransactionPrescription;
 use App\Models\User;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
@@ -310,47 +309,6 @@ class DatabaseSeeder extends Seeder
             ],
         ])->mapWithKeys(fn (array $lens) => [$lens['sku'] => Lens::create($lens)]);
 
-        $resepBudi = Prescription::create([
-            'customer_id' => $budi->id,
-            'doctor_or_optician' => 'Dr. Robert Sp.M',
-            'examination_date' => '2026-08-15',
-            'prescription_type' => 'Distance',
-            'source' => 'in_store',
-            'od_sph' => '-1.25',
-            'od_cyl' => '-0.50',
-            'od_axis' => '90',
-            'od_add' => '0',
-            'od_pd' => '31.5',
-            'os_sph' => '-1.00',
-            'os_cyl' => '-0.25',
-            'os_axis' => '80',
-            'os_add' => '0',
-            'os_pd' => '31.5',
-            'pd_total' => '63',
-            'fitting_height' => '18',
-            'notes' => 'Pengguna lensa single vision, disarankan anti reflective.',
-        ]);
-
-        $resepSiti = Prescription::create([
-            'customer_id' => $siti->id,
-            'doctor_or_optician' => 'Optometris Dian',
-            'examination_date' => '2026-09-01',
-            'prescription_type' => 'Progressive',
-            'source' => 'bring_own',
-            'od_sph' => '-2.50',
-            'od_cyl' => '-1.00',
-            'od_axis' => '180',
-            'od_add' => '+1.50',
-            'od_pd' => '32',
-            'os_sph' => '-2.75',
-            'os_cyl' => '-0.75',
-            'os_axis' => '175',
-            'os_add' => '+1.50',
-            'os_pd' => '31',
-            'pd_total' => '63',
-            'notes' => 'Butuh lensa progresif untuk jarak jauh dan dekat.',
-        ]);
-
         $promoMerdeka = Promotion::create([
             'name' => 'Diskon Merdeka 15%',
             'description' => 'Diskon 15% untuk pembelian minimal Rp 1.000.000.',
@@ -383,46 +341,34 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $trx1 = Transaction::create([
-            'invoice_number' => 'TRX-20260920-00123',
-            'store_id' => $pusat->id,
-            'staff_id' => $staff->id,
+            'sales_no' => 'TRX-20260920-00123',
+            'sales_date' => '2026-09-20',
+            'sales_time' => '14:30:00',
             'customer_id' => $budi->id,
-            'prescription_id' => $resepBudi->id,
-            'subtotal' => 4000000,
-            'discount_amount' => 600000,
-            'promo_id' => $promoMerdeka->id,
-            'total_amount' => 3400000,
-            'payment_status' => 'paid',
-            'payment_method' => 'transfer',
-            'status' => 'completed',
-            'notes' => 'Diskon Merdeka 15% otomatis diterapkan.',
-            'transaction_date' => '2026-09-20 14:30:00',
+            'input_by' => $staff->name,
+            'payment_by' => 'transfer',
+            'grandtotal' => 3400000,
+            'sales_notes' => 'Diskon Merdeka 15% otomatis diterapkan.',
+            'sales_status' => 'completed',
         ]);
 
-        TransactionItem::create([
-            'transaction_id' => $trx1->id,
-            'item_type' => 'frame',
-            'frame_id' => $frames['FR-RB-001']->id,
-            'name' => 'Ray-Ban Aviator Classic',
-            'quantity' => 1,
-            'price' => 2500000,
-            'discount' => 0,
-            'subtotal' => 2500000,
-        ]);
+        $this->seedItem($trx1, 1, 'frame', $frames['FR-RB-001'], $budi->name, 1, 15);
+        $this->seedItem($trx1, 2, 'lens', $lenses['LS-ES-001'], $budi->name, 1, 15);
 
-        TransactionItem::create([
-            'transaction_id' => $trx1->id,
+        $this->addResep($trx1, [
+            'sortno' => 2,
             'item_type' => 'lens',
-            'lens_id' => $lenses['LS-ES-001']->id,
-            'name' => 'Essilor Crizal Easy Pro 1.56',
-            'quantity' => 1,
-            'price' => 1500000,
-            'discount' => 0,
-            'subtotal' => 1500000,
+            'itemno' => $lenses['LS-ES-001']->id,
+            'resep' => 'Dr. Robert Sp.M',
+            'jenis' => 'Distance',
+            'ro1' => 'Optometris Sari',
+            'ro2' => 'Teknisi Rudi',
+            'od' => ['sph' => '-1.25', 'cyl' => '-0.50', 'axis' => '90', 'add' => '0', 'pd' => '31.5'],
+            'os' => ['sph' => '-1.00', 'cyl' => '-0.25', 'axis' => '80', 'add' => '0', 'pd' => '31.5'],
         ]);
 
         Payment::create([
-            'transaction_id' => $trx1->id,
+            'sales_no' => $trx1->sales_no,
             'amount' => 3400000,
             'payment_method' => 'transfer',
             'reference_number' => 'TRF-20260920-8891',
@@ -431,46 +377,35 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $trx2 = Transaction::create([
-            'invoice_number' => 'TRX-20260925-00145',
-            'store_id' => $pusat->id,
-            'staff_id' => $staff->id,
+            'sales_no' => 'TRX-20260925-00145',
+            'sales_date' => '2026-09-25',
+            'sales_time' => '11:00:00',
             'customer_id' => $siti->id,
-            'prescription_id' => $resepSiti->id,
-            'subtotal' => 8600000,
-            'discount_amount' => 150000,
-            'promo_id' => $promoFrame->id,
-            'total_amount' => 8450000,
-            'payment_status' => 'down_payment',
-            'payment_method' => 'qris',
-            'status' => 'processing',
-            'notes' => 'DP Rp 5.000.000 via QRIS, sisa dibayar saat pengambilan.',
-            'transaction_date' => '2026-09-25 11:00:00',
+            'input_by' => $staff->name,
+            'payment_by' => 'qris',
+            'grandtotal' => 8452360,
+            'sales_notes' => 'Potongan Frame Rp 150.000, DP Rp 5.000.000 via QRIS.',
+            'sales_status' => 'processing',
         ]);
 
-        TransactionItem::create([
-            'transaction_id' => $trx2->id,
-            'item_type' => 'frame',
-            'frame_id' => $frames['FR-GM-001']->id,
-            'name' => 'Gentle Monster South Side',
-            'quantity' => 1,
-            'price' => 3400000,
-            'discount' => 0,
-            'subtotal' => 3400000,
-        ]);
+        $this->seedItem($trx2, 1, 'frame', $frames['FR-GM-001'], $siti->name, 1, 1.74);
+        $this->seedItem($trx2, 2, 'lens', $lenses['LS-ZS-001'], $siti->name, 1, 1.74);
 
-        TransactionItem::create([
-            'transaction_id' => $trx2->id,
+        $this->addResep($trx2, [
+            'sortno' => 2,
             'item_type' => 'lens',
-            'lens_id' => $lenses['LS-ZS-001']->id,
-            'name' => 'Zeiss DriveSafe Progressive 1.67',
-            'quantity' => 1,
-            'price' => 5200000,
-            'discount' => 0,
-            'subtotal' => 5200000,
+            'itemno' => $lenses['LS-ZS-001']->id,
+            'resep' => 'Optometris Dian',
+            'jenis' => 'Progressive',
+            'ro1' => 'Optometris Sari',
+            'ro2' => 'Teknisi Rudi',
+            'od' => ['sph' => '-2.50', 'cyl' => '-1.00', 'axis' => '180', 'add' => '+1.50', 'pd' => '32'],
+            'os' => ['sph' => '-2.75', 'cyl' => '-0.75', 'axis' => '175', 'add' => '+1.50', 'pd' => '31'],
+            'ket' => 'Butuh lensa progresif untuk jarak jauh dan dekat.',
         ]);
 
         Payment::create([
-            'transaction_id' => $trx2->id,
+            'sales_no' => $trx2->sales_no,
             'amount' => 5000000,
             'payment_method' => 'qris',
             'reference_number' => 'QRIS-20260925-4471',
@@ -479,46 +414,22 @@ class DatabaseSeeder extends Seeder
         ]);
 
         $trx3 = Transaction::create([
-            'invoice_number' => 'TRX-20260926-00150',
-            'store_id' => $pusat->id,
-            'staff_id' => $staff->id,
+            'sales_no' => 'TRX-20260926-00150',
+            'sales_date' => '2026-09-26',
+            'sales_time' => '10:15:00',
             'customer_id' => $hendra->id,
-            'prescription_id' => null,
-            'subtotal' => 2900000,
-            'discount_amount' => 0,
-            'promo_id' => null,
-            'total_amount' => 2900000,
-            'payment_status' => 'paid',
-            'payment_method' => 'cash',
-            'status' => 'ready',
-            'notes' => 'Kacamata siap diambil di toko pusat.',
-            'transaction_date' => '2026-09-26 10:15:00',
+            'input_by' => $staff->name,
+            'payment_by' => 'cash',
+            'grandtotal' => 2900000,
+            'sales_notes' => 'Kacamata siap diambil di toko pusat.',
+            'sales_status' => 'ready',
         ]);
 
-        TransactionItem::create([
-            'transaction_id' => $trx3->id,
-            'item_type' => 'frame',
-            'frame_id' => $frames['FR-OK-001']->id,
-            'name' => 'Oakley Holbrook',
-            'quantity' => 1,
-            'price' => 1950000,
-            'discount' => 0,
-            'subtotal' => 1950000,
-        ]);
-
-        TransactionItem::create([
-            'transaction_id' => $trx3->id,
-            'item_type' => 'lens',
-            'lens_id' => $lenses['LS-HY-001']->id,
-            'name' => 'Hoya Hilux Stellify 1.56',
-            'quantity' => 1,
-            'price' => 950000,
-            'discount' => 0,
-            'subtotal' => 950000,
-        ]);
+        $this->seedItem($trx3, 1, 'frame', $frames['FR-OK-001'], $hendra->name, 1, 0);
+        $this->seedItem($trx3, 2, 'lens', $lenses['LS-HY-001'], $hendra->name, 1, 0);
 
         Payment::create([
-            'transaction_id' => $trx3->id,
+            'sales_no' => $trx3->sales_no,
             'amount' => 2900000,
             'payment_method' => 'cash',
             'paid_at' => '2026-09-26 10:20:00',
@@ -527,80 +438,114 @@ class DatabaseSeeder extends Seeder
 
         $this->seedAdditionalCatalog($frames, $lenses);
         $extraCustomers = $this->seedAdditionalCustomers();
-        $this->seedAdditionalPrescriptions();
         $this->seedAdditionalPromotions();
         $this->seedAdditionalTransactions($frames, $lenses, $extraCustomers);
 
-        $this->attachWearer($trx1, $budi->name, $trx1->prescription_id);
-        $this->attachWearer($trx2, $siti->name, $trx2->prescription_id);
-        $this->attachWearer($trx3, $hendra->name);
-
-        $this->seedMultiWearerTransaction($pusat, $staff, $budi, $resepBudi);
+        $this->seedMultiWearerTransaction($staff, $budi, $frames, $lenses);
     }
 
     /**
-     * Pasang pemakai (user) pada transaksi dan tautkan seluruh itemnya.
+     * Satu baris item transaksi (stok sengaja tidak dikurangi saat seeding).
+     *
+     * @param  Frame|Lens|Accessory  $product
      */
-    private function attachWearer(Transaction $transaction, string $name, ?int $prescriptionId = null): void
+    private function seedItem(Transaction $transaction, int $sortno, string $type, $product, string $username, int $qty, float $discPercent): void
     {
-        $wearer = TransactionUser::create([
-            'transaction_id' => $transaction->id,
-            'name' => $name,
-            'prescription_id' => $prescriptionId,
-            'status' => $transaction->status,
-            'ro1' => 'Optometris Sari',
-            'ro2' => 'Teknisi Rudi',
-        ]);
+        $price = (float) $product->sell_price;
 
-        TransactionItem::where('transaction_id', $transaction->id)
-            ->whereNull('transaction_user_id')
-            ->update(['transaction_user_id' => $wearer->id]);
+        TransactionItem::create([
+            'sales_no' => $transaction->sales_no,
+            'sortno' => $sortno,
+            'itemno' => (string) $product->id,
+            'item_type' => $type,
+            'item_description' => $product->name,
+            'username' => $username,
+            'qty' => $qty,
+            'unit' => 'pcs',
+            'price' => $price,
+            'disc_percent' => $discPercent,
+            'subtotal' => round($price * $qty * (1 - $discPercent / 100), 2),
+        ]);
+    }
+
+    /**
+     * Dua baris resep (R = OD kanan, L = OS kiri) menempel pada sortno item.
+     *
+     * @param  array<string, mixed>  $rx
+     */
+    private function addResep(Transaction $transaction, array $rx): void
+    {
+        foreach (['R' => 'od', 'L' => 'os'] as $sisi => $eye) {
+            $values = $rx[$eye] ?? [];
+
+            TransactionPrescription::create([
+                'sales_no' => $transaction->sales_no,
+                'sortno' => $rx['sortno'],
+                'itemno_lensa' => $rx['itemno'] ?? null,
+                'item_type' => $rx['item_type'],
+                'qty' => 1,
+                'sisi' => $sisi,
+                'sph' => $values['sph'] ?? null,
+                'cyl' => $values['cyl'] ?? null,
+                'axis' => $values['axis'] ?? null,
+                'add' => $values['add'] ?? null,
+                'pd' => $values['pd'] ?? null,
+                'ro1' => $rx['ro1'] ?? null,
+                'ro2' => $rx['ro2'] ?? null,
+                'resep' => $rx['resep'] ?? null,
+                'jenis_lensa' => $rx['jenis'] ?? null,
+                'ket' => $rx['ket'] ?? null,
+            ]);
+        }
     }
 
     /**
      * Contoh 1 transaksi / 1 member id dengan beberapa pemakai
      * (Ayah, Anak 1, Anak 2) — masing-masing item & resep sendiri.
+     *
+     * @param  Collection<string, Frame>  $frames
+     * @param  Collection<string, Lens>  $lenses
      */
-    private function seedMultiWearerTransaction(Store $store, User $staff, Customer $customer, ?Prescription $customerPrescription): void
+    private function seedMultiWearerTransaction(User $staff, Customer $customer, $frames, $lenses): void
     {
-        $resepAnak1 = Prescription::create([
-            'customer_id' => $customer->id,
-            'doctor_or_optician' => 'Optometris Dian',
-            'examination_date' => '2026-09-10',
-            'od_sph' => '-2.50',
-            'od_cyl' => '-0.75',
-            'od_axis' => '180',
-            'os_sph' => '-2.25',
-            'os_cyl' => '-0.50',
-            'os_axis' => '175',
-            'pd_total' => '58',
-            'notes' => 'Resep anak pertama.',
-            'source' => 'in_store',
-        ]);
-
-        $resepAnak2 = Prescription::create([
-            'customer_id' => $customer->id,
-            'doctor_or_optician' => 'Optometris Dian',
-            'examination_date' => '2026-09-10',
-            'od_sph' => '-1.75',
-            'os_sph' => '-1.50',
-            'pd_total' => '56',
-            'notes' => 'Resep anak kedua.',
-            'source' => 'bring_own',
-        ]);
-
         $plan = [
-            ['name' => $customer->name, 'rx' => $customerPrescription?->id, 'items' => [['frame', 'FR-RB-002', 1], ['lens', 'LS-ES-002', 1]]],
-            ['name' => 'Raka (Anak 1)', 'rx' => $resepAnak1->id, 'items' => [['frame', 'FR-KD-001', 1], ['lens', 'LS-HY-001', 1]]],
-            ['name' => 'Rini (Anak 2)', 'rx' => $resepAnak2->id, 'items' => [['lens', 'LS-ES-001', 1]]],
+            [
+                'name' => $customer->name,
+                'items' => [['frame', 'FR-RB-002', 1], ['lens', 'LS-ES-002', 1]],
+                'resep' => [
+                    'resep' => 'Dr. Robert Sp.M',
+                    'jenis' => 'Distance',
+                    'od' => ['sph' => '-1.25', 'cyl' => '-0.50', 'axis' => '90', 'pd' => '31.5'],
+                    'os' => ['sph' => '-1.00', 'cyl' => '-0.25', 'axis' => '80', 'pd' => '31.5'],
+                ],
+            ],
+            [
+                'name' => 'Raka (Anak 1)',
+                'items' => [['frame', 'FR-KD-001', 1], ['lens', 'LS-HY-001', 1]],
+                'resep' => [
+                    'resep' => 'Optometris Dian',
+                    'od' => ['sph' => '-2.50', 'cyl' => '-0.75', 'axis' => '180', 'pd' => '29'],
+                    'os' => ['sph' => '-2.25', 'cyl' => '-0.50', 'axis' => '175', 'pd' => '29'],
+                    'ket' => 'Resep anak pertama.',
+                ],
+            ],
+            [
+                'name' => 'Rini (Anak 2)',
+                'items' => [['lens', 'LS-ES-001', 1]],
+                'resep' => [
+                    'resep' => 'Optometris Dian',
+                    'od' => ['sph' => '-1.75', 'pd' => '28'],
+                    'os' => ['sph' => '-1.50', 'pd' => '28'],
+                    'ket' => 'Resep anak kedua.',
+                ],
+            ],
         ];
 
-        $groups = [];
-        $subtotal = 0.0;
+        $sortno = 0;
+        $grandtotal = 0.0;
+        $lines = [];
 
         foreach ($plan as $group) {
-            $lines = [];
-
             foreach ($group['items'] as [$type, $sku, $qty]) {
                 $product = $type === 'frame'
                     ? Frame::query()->where('sku', $sku)->first()
@@ -611,62 +556,58 @@ class DatabaseSeeder extends Seeder
                 }
 
                 $price = (float) $product->sell_price;
-                $subtotal += $price * $qty;
-                $lines[] = ['type' => $type, 'product' => $product, 'qty' => $qty, 'price' => $price];
+                $grandtotal += $price * $qty;
+                $lines[] = ['group' => $group, 'type' => $type, 'product' => $product, 'qty' => $qty, 'price' => $price, 'sortno' => ++$sortno];
             }
-
-            $groups[] = ['name' => $group['name'], 'rx' => $group['rx'], 'lines' => $lines];
         }
 
-        if ($subtotal <= 0) {
+        if ($grandtotal <= 0) {
             return;
         }
 
         $transaction = Transaction::create([
-            'invoice_number' => 'TRX-'.now()->format('Ymd').'-00200',
-            'store_id' => $store->id,
-            'staff_id' => $staff->id,
+            'sales_no' => 'TRX-'.now()->format('Ymd').'-00200',
+            'sales_date' => now()->subDay()->toDateString(),
+            'sales_time' => '09:30:00',
             'customer_id' => $customer->id,
-            'prescription_id' => $customerPrescription?->id,
-            'subtotal' => $subtotal,
-            'discount_amount' => 0,
-            'total_amount' => $subtotal,
-            'payment_status' => 'down_payment',
-            'payment_method' => 'cash',
-            'status' => 'ordered',
-            'notes' => 'Satu transaksi untuk ayah & dua anaknya.',
-            'transaction_date' => now()->subDay()->setTime(9, 30),
+            'input_by' => $staff->name,
+            'payment_by' => 'cash',
+            'grandtotal' => $grandtotal,
+            'sales_notes' => 'Satu transaksi untuk ayah & dua anaknya.',
+            'sales_status' => 'ordered',
         ]);
 
-        foreach ($groups as $group) {
-            $wearer = TransactionUser::create([
-                'transaction_id' => $transaction->id,
-                'name' => $group['name'],
-                'prescription_id' => $group['rx'],
-                'status' => $transaction->status,
-                'ro1' => 'Optometris Dian',
-                'ro2' => 'Teknisi Rudi',
+        foreach ($lines as $line) {
+            $group = $line['group'];
+
+            TransactionItem::create([
+                'sales_no' => $transaction->sales_no,
+                'sortno' => $line['sortno'],
+                'itemno' => (string) $line['product']->id,
+                'item_type' => $line['type'],
+                'item_description' => $line['product']->name,
+                'username' => $group['name'],
+                'qty' => $line['qty'],
+                'unit' => 'pcs',
+                'price' => $line['price'],
+                'disc_percent' => 0,
+                'subtotal' => $line['price'] * $line['qty'],
             ]);
 
-            foreach ($group['lines'] as $line) {
-                TransactionItem::create([
-                    'transaction_id' => $transaction->id,
-                    'transaction_user_id' => $wearer->id,
-                    'item_type' => $line['type'],
-                    'frame_id' => $line['type'] === 'frame' ? $line['product']->id : null,
-                    'lens_id' => $line['type'] === 'lens' ? $line['product']->id : null,
-                    'name' => $line['product']->name,
-                    'quantity' => $line['qty'],
-                    'price' => $line['price'],
-                    'discount' => 0,
-                    'subtotal' => $line['price'] * $line['qty'],
+            if ($line['type'] === 'lens' && isset($group['resep'])) {
+                $this->addResep($transaction, $group['resep'] + [
+                    'sortno' => $line['sortno'],
+                    'item_type' => 'lens',
+                    'itemno' => $line['product']->id,
+                    'ro1' => 'Optometris Dian',
+                    'ro2' => 'Teknisi Rudi',
                 ]);
             }
         }
 
         Payment::create([
-            'transaction_id' => $transaction->id,
-            'amount' => (int) round($subtotal / 2, -3),
+            'sales_no' => $transaction->sales_no,
+            'amount' => (int) round($grandtotal / 2, -3),
             'payment_method' => 'cash',
             'paid_at' => now()->subDay()->setTime(10, 0),
             'note' => 'DP 50%.',
@@ -778,45 +719,6 @@ class DatabaseSeeder extends Seeder
         ]));
     }
 
-    private function seedAdditionalPrescriptions(): void
-    {
-        Prescription::create([
-            'customer_id' => $budiId = Customer::where('member_id', 'KCM-000012')->value('id'),
-            'doctor_or_optician' => 'Optometris Dian',
-            'examination_date' => '2025-01-18',
-            'prescription_type' => 'Distance',
-            'od_sph' => '-1.00', 'od_cyl' => '-0.25', 'od_axis' => '175', 'od_add' => '0', 'od_pd' => '31.5',
-            'os_sph' => '-0.75', 'os_cyl' => '-0.50', 'os_axis' => '5', 'os_add' => '0', 'os_pd' => '31.5',
-            'pd_total' => '63', 'fitting_height' => '18',
-            'notes' => 'Resep lama, diganti pada pemeriksaan Agustus 2026.',
-        ]);
-
-        $seed = [
-            ['KCM-000016', 'Dr. Robert Sp.M', '2026-07-12', 'Distance', '-3.50', '-1.00', '160', '-3.25', '-1.25', '20', '66', '20'],
-            ['KCM-000018', 'Optometris Dian', '2026-05-03', 'Reading', '+1.75', '-0.50', '30', '+2.00', '-0.25', '150', '68', '21'],
-            ['KCM-000020', 'Dr. Robert Sp.M', '2024-08-09', 'Progressive', '-2.25', '-0.75', '90', '-2.00', '-0.50', '80', '64', '19'],
-            ['KCM-000022', 'Optometris Maya', '2026-06-21', 'Distance', '-4.25', '-1.50', '15', '-4.50', '-1.25', '165', '65', '20'],
-        ];
-
-        foreach ($seed as $index => $row) {
-            $customerId = Customer::where('member_id', $row[0])->value('id');
-
-            Prescription::create([
-                'customer_id' => $customerId,
-                'doctor_or_optician' => $row[1],
-                'examination_date' => $row[2],
-                'prescription_type' => $row[3],
-                'source' => $index % 2 === 0 ? 'in_store' : 'bring_own',
-                'od_sph' => $row[4], 'od_cyl' => $row[5], 'od_axis' => $row[6], 'od_add' => '+0.75', 'od_pd' => '32',
-                'os_sph' => $row[7], 'os_cyl' => $row[8], 'os_axis' => $row[9], 'os_add' => '+0.75', 'os_pd' => '32',
-                'pd_total' => $row[10], 'fitting_height' => $row[11],
-                'notes' => null,
-            ]);
-        }
-
-        unset($budiId, $seed);
-    }
-
     private function seedAdditionalPromotions(): void
     {
         Promotion::create([
@@ -851,10 +753,32 @@ class DatabaseSeeder extends Seeder
      */
     private function seedAdditionalTransactions($frames, $lenses, $customers): void
     {
-        $stores = Store::orderBy('id')->get();
         $staffMembers = User::whereIn('role', ['admin', 'staff'])->orderBy('id')->get();
         $promos = Promotion::where('is_active', true)->get();
         $allCustomers = Customer::orderBy('id')->get();
+
+        $reseps = [
+            'KCM-000016' => [
+                'resep' => 'Dr. Robert Sp.M', 'jenis' => 'Distance',
+                'od' => ['sph' => '-3.50', 'cyl' => '-1.00', 'axis' => '160', 'add' => '+0.75', 'pd' => '32'],
+                'os' => ['sph' => '-3.25', 'cyl' => '-1.25', 'axis' => '20', 'add' => '+0.75', 'pd' => '32'],
+            ],
+            'KCM-000018' => [
+                'resep' => 'Optometris Dian', 'jenis' => 'Reading',
+                'od' => ['sph' => '+1.75', 'cyl' => '-0.50', 'axis' => '30', 'add' => '+0.75', 'pd' => '32'],
+                'os' => ['sph' => '+2.00', 'cyl' => '-0.25', 'axis' => '150', 'add' => '+0.75', 'pd' => '32'],
+            ],
+            'KCM-000020' => [
+                'resep' => 'Dr. Robert Sp.M', 'jenis' => 'Progressive',
+                'od' => ['sph' => '-2.25', 'cyl' => '-0.75', 'axis' => '90', 'add' => '+0.75', 'pd' => '32'],
+                'os' => ['sph' => '-2.00', 'cyl' => '-0.50', 'axis' => '80', 'add' => '+0.75', 'pd' => '32'],
+            ],
+            'KCM-000022' => [
+                'resep' => 'Optometris Maya', 'jenis' => 'Distance',
+                'od' => ['sph' => '-4.25', 'cyl' => '-1.50', 'axis' => '15', 'add' => '+0.75', 'pd' => '32'],
+                'os' => ['sph' => '-4.50', 'cyl' => '-1.25', 'axis' => '165', 'add' => '+0.75', 'pd' => '32'],
+            ],
+        ];
 
         // [daysAgo, status, paymentStatus, promoIndex|null, useFrame]
         $plan = [
@@ -891,100 +815,95 @@ class DatabaseSeeder extends Seeder
             $date = now()->subDays($daysAgo);
             $customer = $allCustomers[$index % $allCustomers->count()];
             $staffMember = $staffMembers[$index % $staffMembers->count()];
-            $store = $stores->firstWhere('id', $staffMember->store_id) ?? $stores->first();
             $promo = $promoIndex === null ? null : $promos->values()->get($promoIndex);
+            $paymentBy = ['cash', 'transfer', 'qris', 'card'][$index % 4];
 
             $transaction = Transaction::create([
-                'invoice_number' => 'TRX-'.$date->format('Ymd').'-'.str_pad((string) $sequence++, 5, '0', STR_PAD_LEFT),
-                'store_id' => $store->id,
-                'staff_id' => $staffMember->id,
+                'sales_no' => 'TRX-'.$date->format('Ymd').'-'.str_pad((string) $sequence++, 5, '0', STR_PAD_LEFT),
+                'sales_date' => $date->toDateString(),
+                'sales_time' => sprintf('%02d:%02d:00', 10 + ($index % 8), ($index * 7) % 60),
                 'customer_id' => $customer->id,
-                'prescription_id' => $customer->prescriptions()->value('id'),
-                'subtotal' => 0,
-                'discount_amount' => 0,
-                'promo_id' => $promo?->id,
-                'total_amount' => 0,
-                'payment_status' => $paymentStatus,
-                'payment_method' => ['cash', 'transfer', 'qris', 'card'][$index % 4],
-                'status' => $status,
-                'notes' => $index % 6 === 0 ? 'Pelanggan meminta penyesuaian PD.' : null,
-                'transaction_date' => $date->setTime(10 + ($index % 8), ($index * 7) % 60),
+                'input_by' => $staffMember->name,
+                'payment_by' => $paymentBy,
+                'grandtotal' => 0,
+                'sales_notes' => $index % 6 === 0 ? 'Pelanggan meminta penyesuaian PD.' : null,
+                'sales_status' => $status,
             ]);
 
-            $subtotal = 0.0;
+            $gross = 0.0;
             $lineCount = $index % 3 === 0 ? 2 : 1;
-
-            $wearer = TransactionUser::create([
-                'transaction_id' => $transaction->id,
-                'name' => $customer->name,
-                'prescription_id' => $transaction->prescription_id,
-                'status' => $status,
-                'ro1' => 'Optometris Sari',
-                'ro2' => 'Teknisi Rudi',
-            ]);
+            $lines = [];
 
             for ($line = 0; $line < $lineCount; $line++) {
                 $isFrame = $line === 0 ? $useFrame : ! $useFrame;
+                $product = $isFrame
+                    ? $framePool[($index + $line) % $framePool->count()]
+                    : $lensPool[($index + $line) % $lensPool->count()];
+                $qty = $index % 5 === 0 && $line === 1 ? 2 : 1;
 
-                if ($isFrame) {
-                    $product = $framePool[($index + $line) % $framePool->count()];
-                    $itemType = 'frame';
-                    $frameId = $product->id;
-                    $lensId = null;
-                } else {
-                    $product = $lensPool[($index + $line) % $lensPool->count()];
-                    $itemType = 'lens';
-                    $frameId = null;
-                    $lensId = $product->id;
-                }
-
-                $price = (float) $product->sell_price;
-                $quantity = $index % 5 === 0 && $line === 1 ? 2 : 1;
-                $lineSubtotal = $price * $quantity;
-                $subtotal += $lineSubtotal;
-
-                TransactionItem::create([
-                    'transaction_id' => $transaction->id,
-                    'transaction_user_id' => $wearer->id,
-                    'item_type' => $itemType,
-                    'frame_id' => $frameId,
-                    'lens_id' => $lensId,
-                    'name' => $product->name,
-                    'quantity' => $quantity,
-                    'price' => $price,
-                    'discount' => 0,
-                    'subtotal' => $lineSubtotal,
-                ]);
+                $gross += (float) $product->sell_price * $qty;
+                $lines[] = ['product' => $product, 'type' => $isFrame ? 'frame' : 'lens', 'qty' => $qty];
             }
 
-            $discount = $promo ? $this->promotionDiscount($promo, $subtotal) : 0.0;
-            $total = max(0, $subtotal - $discount);
+            $discount = $promo ? $this->promotionDiscount($promo, $gross) : 0.0;
+            $discPercent = $gross > 0 ? round($discount / $gross * 100, 2) : 0.0;
+            $grandtotal = 0.0;
+            $resepAdded = false;
+            $resep = $reseps[$customer->member_id] ?? null;
 
-            $transaction->update([
-                'subtotal' => $subtotal,
-                'discount_amount' => $discount,
-                'total_amount' => $total,
-            ]);
+            foreach ($lines as $position => $line) {
+                $sortno = $position + 1;
+                $price = (float) $line['product']->sell_price;
+                $subtotal = round($price * $line['qty'] * (1 - $discPercent / 100), 2);
+                $grandtotal += $subtotal;
+
+                TransactionItem::create([
+                    'sales_no' => $transaction->sales_no,
+                    'sortno' => $sortno,
+                    'itemno' => (string) $line['product']->id,
+                    'item_type' => $line['type'],
+                    'item_description' => $line['product']->name,
+                    'username' => $customer->name,
+                    'qty' => $line['qty'],
+                    'unit' => 'pcs',
+                    'price' => $price,
+                    'disc_percent' => $discPercent,
+                    'subtotal' => $subtotal,
+                ]);
+
+                if ($line['type'] === 'lens' && $resep && ! $resepAdded) {
+                    $this->addResep($transaction, $resep + [
+                        'sortno' => $sortno,
+                        'item_type' => 'lens',
+                        'itemno' => $line['product']->id,
+                        'ro1' => 'Optometris Sari',
+                        'ro2' => 'Teknisi Rudi',
+                    ]);
+                    $resepAdded = true;
+                }
+            }
+
+            $transaction->update(['grandtotal' => round($grandtotal, 2)]);
 
             $paid = match ($paymentStatus) {
-                'paid' => $total,
-                'down_payment' => $total > 0 ? (int) round($total / 2, -3) : 0,
+                'paid' => $grandtotal,
+                'down_payment' => $grandtotal > 0 ? (int) round($grandtotal / 2, -3) : 0,
                 default => 0.0,
             };
 
             if ($paid > 0) {
                 Payment::create([
-                    'transaction_id' => $transaction->id,
+                    'sales_no' => $transaction->sales_no,
                     'amount' => $paid,
-                    'payment_method' => $transaction->payment_method,
-                    'reference_number' => strtoupper($transaction->payment_method).'-'.$date->format('ymd').'-'.str_pad((string) ($sequence + $index), 4, '0', STR_PAD_LEFT),
+                    'payment_method' => $paymentBy,
+                    'reference_number' => strtoupper($paymentBy).'-'.$date->format('ymd').'-'.str_pad((string) ($sequence + $index), 4, '0', STR_PAD_LEFT),
                     'paid_at' => $date->copy()->addHours(2),
                     'note' => $paymentStatus === 'down_payment' ? 'DP 50%' : 'Pelunasan penuh.',
                 ]);
             }
         }
 
-        unset($plan, $framePool, $lensPool, $promoIndex, $product);
+        unset($plan, $framePool, $lensPool, $promoIndex, $product, $reseps);
     }
 
     private function promotionDiscount(Promotion $promotion, float $subtotal): float

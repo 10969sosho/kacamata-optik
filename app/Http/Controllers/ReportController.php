@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Transaction;
+use App\Models\TransactionItem;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -18,7 +19,7 @@ class ReportController extends Controller
             'rows' => $this->query($request)->paginate(15)->withQueryString(),
             'summary' => $this->summary($this->query($request)->get()),
             'staff' => User::whereIn('role', ['admin', 'staff'])->orderBy('name')->get(),
-            'filters' => $request->only(['from', 'to', 'staff_id', 'payment_status', 'item_type']),
+            'filters' => $request->only(['from', 'to', 'input_by', 'payment_by', 'item_type']),
         ]);
     }
 
@@ -29,20 +30,18 @@ class ReportController extends Controller
 
         return response()->streamDownload(function () use ($rows) {
             $out = fopen('php://output', 'w');
-            fputcsv($out, ['Invoice', 'Tanggal', 'Customer', 'Kasir', 'Subtotal', 'Diskon', 'Total', 'Status Bayar', 'Metode', 'Status Order']);
+            fputcsv($out, ['Sales No', 'Tanggal', 'Jam', 'Customer', 'Kasir', 'Grandtotal', 'Metode Bayar', 'Status']);
 
             foreach ($rows as $t) {
                 fputcsv($out, [
-                    $t->invoice_number,
-                    optional($t->transaction_date)->format('d/m/Y H:i'),
+                    $t->sales_no,
+                    $t->sales_date?->format('d/m/Y'),
+                    substr((string) $t->sales_time, 0, 5),
                     $t->customer?->name,
-                    $t->staff?->name,
-                    $t->subtotal,
-                    $t->discount_amount,
-                    $t->total_amount,
-                    $t->payment_status,
-                    $t->payment_method,
-                    $t->status,
+                    $t->input_by,
+                    $t->grandtotal,
+                    $t->payment_by,
+                    $t->sales_status,
                 ]);
             }
 
@@ -56,17 +55,18 @@ class ReportController extends Controller
     private function query(Request $request)
     {
         return Transaction::query()
-            ->with(['customer', 'staff'])
-            ->when($request->filled('from'), fn ($q) => $q->whereDate('transaction_date', '>=', $request->date('from')))
-            ->when($request->filled('to'), fn ($q) => $q->whereDate('transaction_date', '<=', $request->date('to')))
-            ->when($request->filled('staff_id'), fn ($q) => $q->where('staff_id', $request->integer('staff_id')))
-            ->when($request->filled('payment_status'), fn ($q) => $q->where('payment_status', $request->string('payment_status')))
+            ->with(['customer', 'items'])
+            ->when($request->filled('from'), fn ($q) => $q->whereDate('sales_date', '>=', $request->date('from')))
+            ->when($request->filled('to'), fn ($q) => $q->whereDate('sales_date', '<=', $request->date('to')))
+            ->when($request->filled('input_by'), fn ($q) => $q->where('input_by', $request->string('input_by')))
+            ->when($request->filled('payment_by'), fn ($q) => $q->where('payment_by', $request->string('payment_by')))
             ->when($request->filled('item_type'), fn ($q) => $q->whereHas(
                 'items',
                 fn ($item) => $item->where('item_type', $request->string('item_type')),
             ))
-            ->whereNotIn('status', ['cancelled', 'refunded'])
-            ->orderBy('transaction_date');
+            ->whereNotIn('sales_status', ['cancelled', 'refunded'])
+            ->orderBy('sales_date')
+            ->orderBy('sales_no');
     }
 
     /**
@@ -75,16 +75,19 @@ class ReportController extends Controller
      */
     private function summary($rows): array
     {
-        $gross = (float) $rows->sum('subtotal');
-        $discount = (float) $rows->sum('discount_amount');
+        $gross = (float) $rows->sum('grandtotal');
+        $discount = (float) TransactionItem::query()
+            ->whereIn('sales_no', $rows->pluck('sales_no'))
+            ->get()
+            ->sum(fn (TransactionItem $item) => $item->discountAmount());
         $count = $rows->count();
 
         return [
             'gross' => $gross,
             'discount' => $discount,
-            'net' => $gross - $discount,
+            'net' => $gross,
             'count' => $count,
-            'atv' => $count > 0 ? ($gross - $discount) / $count : 0,
+            'atv' => $count > 0 ? $gross / $count : 0,
         ];
     }
 }

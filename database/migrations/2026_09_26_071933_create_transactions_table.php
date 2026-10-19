@@ -9,26 +9,20 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('transactions', function (Blueprint $table) {
-            $table->id();
-            $table->string('invoice_number')->unique();
-            $table->foreignId('store_id')->nullable()->constrained('stores')->nullOnDelete();
-            $table->foreignId('staff_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->foreignId('customer_id')->constrained('customers')->restrictOnDelete();
-            $table->foreignId('prescription_id')->nullable()->constrained('prescriptions')->nullOnDelete();
-            $table->decimal('subtotal', 12, 2);
-            $table->decimal('discount_amount', 12, 2)->default(0);
-            $table->foreignId('promo_id')->nullable()->constrained('promotions')->nullOnDelete();
-            $table->decimal('total_amount', 12, 2);
-            $table->string('payment_status')->default('paid');
-            $table->string('payment_method')->default('cash');
-            $table->string('status')->default('completed');
-            $table->text('notes')->nullable();
-            $table->dateTime('transaction_date');
+            $table->string('sales_no')->primary();
+            $table->date('sales_date');
+            $table->time('sales_time');
+            $table->foreignId('customer_id')->nullable()->constrained('customers')->nullOnDelete();
+            $table->string('input_by')->comment('Nama user (kasir) yang input transaksi');
+            $table->string('payment_by')->nullable()->comment('Metode pembayaran: cash, transfer, qris, card');
+            $table->string('edc_id')->nullable();
+            $table->decimal('grandtotal', 12, 2);
+            $table->text('sales_notes')->nullable();
+            $table->string('sales_status')->default('ordered');
             $table->timestamps();
 
-            $table->index('transaction_date');
-            $table->index('payment_status');
-            $table->index('status');
+            $table->index('sales_date');
+            $table->index('sales_status');
         });
     }
 

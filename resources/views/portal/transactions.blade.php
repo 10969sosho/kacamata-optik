@@ -9,20 +9,20 @@
         @forelse ($transactions as $trx)
             @php
                 $steps = ['ordered' => 'Dipesan', 'processing' => 'Diproses', 'ready' => 'Siap', 'completed' => 'Selesai'];
-                $current = array_search($trx->status, array_keys($steps), true);
+                $current = array_search($trx->sales_status, array_keys($steps), true);
             @endphp
             <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <div class="flex items-start justify-between">
                     <div>
-                        <p class="font-mono text-sm font-bold text-slate-900">{{ $trx->invoice_number }}</p>
-                        <p class="text-xs text-slate-500">{{ optional($trx->transaction_date)->format('d M Y, H:i') }}</p>
+                        <p class="font-mono text-sm font-bold text-slate-900">{{ $trx->sales_no }}</p>
+                        <p class="text-xs text-slate-500">{{ $trx->sales_datetime }}</p>
                     </div>
-                    <p class="text-sm font-extrabold text-slate-900">@idr($trx->total_amount)</p>
+                    <p class="text-sm font-extrabold text-slate-900">@idr($trx->grandtotal)</p>
                 </div>
 
                 <ul class="mt-3 space-y-1 text-xs text-slate-500">
                     @foreach ($trx->items as $item)
-                        <li class="flex justify-between"><span>{{ $item->name }} ×{{ $item->quantity }}</span><span>@idr($item->subtotal)</span></li>
+                        <li class="flex justify-between"><span>{{ $item->item_description }} ×{{ $item->qty }}</span><span>@idr($item->subtotal)</span></li>
                     @endforeach
                 </ul>
 
@@ -37,14 +37,14 @@
                         @endforeach
                     </div>
                 @else
-                    <p class="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-center text-xs font-bold uppercase text-rose-600">{{ $trx->status }}</p>
+                    <p class="mt-4 rounded-lg bg-rose-50 px-3 py-2 text-center text-xs font-bold uppercase text-rose-600">{{ $trx->sales_status }}</p>
                 @endif
 
                 <div class="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-xs">
-                    <span class="rounded-full {{ $trx->payment_status === 'paid' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }} px-2.5 py-1 font-bold uppercase">
-                        {{ $trx->payment_status === 'paid' ? 'Lunas' : 'DP' }}
+                    <span class="rounded-full {{ $trx->isPaid() ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }} px-2.5 py-1 font-bold uppercase">
+                        {{ $trx->isPaid() ? 'Lunas' : 'DP' }}
                     </span>
-                    <span class="text-slate-500 capitalize">{{ str_replace('_', ' ', $trx->payment_method) }}</span>
+                    <span class="text-slate-500 capitalize">{{ str_replace('_', ' ', $trx->payment_by ?? '-') }}</span>
                 </div>
 
                 <a href="{{ route('portal.transactions.show', $trx) }}" class="mt-3 flex items-center justify-between rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800">

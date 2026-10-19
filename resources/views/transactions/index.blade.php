@@ -36,7 +36,7 @@
             <table class="w-full text-left text-sm">
                 <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
                     <tr>
-                        <th class="px-5 py-3">Invoice</th>
+                        <th class="px-5 py-3">No. Sales</th>
                         <th class="px-5 py-3">Tanggal</th>
                         <th class="px-5 py-3">Customer</th>
                         <th class="px-5 py-3">Kasir</th>
@@ -49,18 +49,19 @@
                 <tbody class="divide-y divide-slate-100">
                     @forelse ($transactions as $trx)
                         <tr class="hover:bg-slate-50">
-                            <td class="px-5 py-3 font-semibold text-slate-900">{{ $trx->invoice_number }}</td>
-                            <td class="px-5 py-3 text-slate-600">{{ optional($trx->transaction_date)->format('d/m/Y H:i') }}</td>
+                            <td class="px-5 py-3 font-semibold text-slate-900">{{ $trx->sales_no }}</td>
+                            <td class="px-5 py-3 text-slate-600">{{ $trx->sales_datetime }}</td>
                             <td class="px-5 py-3 text-slate-600">{{ $trx->customer?->name ?? '-' }}</td>
-                            <td class="px-5 py-3 text-slate-600">{{ $trx->staff?->name ?? '-' }}</td>
-                            <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($trx->total_amount)</td>
+                            <td class="px-5 py-3 text-slate-600">{{ $trx->input_by }}</td>
+                            <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($trx->grandtotal)</td>
                             <td class="px-5 py-3">
-                                <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $trx->payment_status === 'paid' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">
-                                    {{ $trx->payment_status === 'paid' ? 'LUNAS' : 'DP' }}
+                                @php($paid = (float) ($trx->amount_paid ?? 0) >= (float) $trx->grandtotal)
+                                <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $paid ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">
+                                    {{ $paid ? 'LUNAS' : 'DP' }}
                                 </span>
                             </td>
                             <td class="px-5 py-3">
-                                <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold capitalize text-slate-600">{{ $trx->status }}</span>
+                                <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold capitalize text-slate-600">{{ $trx->sales_status }}</span>
                             </td>
                             <td class="px-5 py-3 text-right">
                                 <a href="{{ route('transactions.show', $trx) }}" class="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-100">Detail</a>

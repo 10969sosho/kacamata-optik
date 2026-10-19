@@ -5,7 +5,7 @@
 @section('content')
     @php
         $steps = ['ordered' => 'Dipesan', 'processing' => 'Diproses', 'ready' => 'Siap Diambil', 'completed' => 'Selesai'];
-        $current = array_search($transaction->status, array_keys($steps), true);
+        $current = array_search($transaction->sales_status, array_keys($steps), true);
     @endphp
 
     <a href="{{ route('portal.transactions') }}" class="mb-4 inline-flex items-center gap-1.5 text-xs font-semibold text-slate-500">
@@ -15,16 +15,17 @@
     <!-- Invoice -->
     <div class="rounded-3xl bg-gradient-to-br from-slate-900 via-slate-800 to-red-900 p-5 text-white shadow-xl">
         <p class="text-[10px] uppercase tracking-[0.25em] text-red-400">Nomor Nota</p>
-        <p class="mt-2 font-mono text-lg font-extrabold tracking-wide">{{ $transaction->invoice_number }}</p>
+        <p class="mt-2 font-mono text-lg font-extrabold tracking-wide">{{ $transaction->sales_no }}</p>
         <div class="mt-1 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
-            <span>{{ optional($transaction->transaction_date)->format('d M Y, H:i') }}</span>
-            <span>{{ $transaction->store?->name ?? '-' }}</span>
+            <span>{{ $transaction->sales_datetime }}</span>
         </div>
 
         @if ($current !== false)
             <div class="mt-5 flex items-center">
                 @foreach ($steps as $key => $label)
-                    @php($done = array_search($key, array_keys($steps), true) <= $current)
+                    @php
+                        $done = array_search($key, array_keys($steps), true) <= $current;
+                    @endphp
                     <div class="flex items-center {{ $loop->last ? '' : 'flex-1' }}">
                         <div class="flex flex-col items-center gap-1">
                             <span class="grid h-7 w-7 place-items-center rounded-full text-[10px] font-bold {{ $done ? 'bg-red-500 text-white' : 'bg-white/10 text-slate-400' }}">✓</span>
@@ -37,7 +38,7 @@
                 @endforeach
             </div>
         @else
-            <p class="mt-4 rounded-lg bg-white/10 px-3 py-2 text-center text-xs font-bold uppercase">{{ $transaction->status }}</p>
+            <p class="mt-4 rounded-lg bg-white/10 px-3 py-2 text-center text-xs font-bold uppercase">{{ $transaction->sales_status }}</p>
         @endif
     </div>
 
@@ -45,23 +46,28 @@
     <section class="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
         <div class="mb-3 flex items-center justify-between">
             <h2 class="text-sm font-bold text-slate-900">Ringkasan Pembayaran</h2>
-            <span class="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase {{ $transaction->payment_status === 'paid' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">
-                {{ $transaction->payment_status === 'paid' ? 'Lunas' : 'DP' }}
+            <span class="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase {{ $transaction->isPaid() ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">
+                {{ $transaction->isPaid() ? 'Lunas' : 'DP' }}
             </span>
         </div>
+
+        @php
+            $gross = $transaction->items->sum(fn ($item) => $item->gross());
+            $discount = $transaction->items->sum(fn ($item) => $item->discountAmount());
+        @endphp
 
         <dl class="space-y-2.5 text-sm">
             <div class="flex justify-between">
                 <dt class="text-slate-500">Subtotal</dt>
-                <dd class="font-semibold text-slate-800">@idr($transaction->subtotal)</dd>
+                <dd class="font-semibold text-slate-800">@idr($gross)</dd>
             </div>
             <div class="flex justify-between">
-                <dt class="text-slate-500">Diskon {!! $transaction->promotion ? '('.e($transaction->promotion->name).')' : '' !!}</dt>
-                <dd class="font-semibold text-rose-600">-@idr($transaction->discount_amount)</dd>
+                <dt class="text-slate-500">Diskon Item</dt>
+                <dd class="font-semibold text-rose-600">-@idr($discount)</dd>
             </div>
             <div class="flex justify-between border-t border-slate-100 pt-2.5 text-base font-extrabold">
                 <dt class="text-slate-900">Total</dt>
-                <dd class="text-slate-900">@idr($transaction->total_amount)</dd>
+                <dd class="text-slate-900">@idr($transaction->grandtotal)</dd>
             </div>
             <div class="flex justify-between">
                 <dt class="text-slate-500">Sudah Dibayar</dt>
@@ -73,7 +79,7 @@
             </div>
         </dl>
 
-        <p class="mt-4 text-xs capitalize text-slate-500">Metode: <b class="text-slate-700">{{ str_replace('_', ' ', $transaction->payment_method) }}</b></p>
+        <p class="mt-4 text-xs capitalize text-slate-500">Metode: <b class="text-slate-700">{{ str_replace('_', ' ', $transaction->payment_by ?? '-') }}</b></p>
     </section>
 
     <!-- Item per pemakai -->
@@ -89,7 +95,6 @@
                             Pemakai: {{ $group['label'] }}
                         </p>
                         <span class="flex items-center gap-1.5 text-[11px] text-slate-500">
-                            <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700 shadow-sm">{{ $group['status_label'] }}</span>
                             <span>{{ $group['items']->count() }} item</span>
                         </span>
                     </div>
@@ -105,8 +110,8 @@
                         @forelse ($group['items'] as $item)
                             <li class="flex items-start justify-between gap-3 py-2.5">
                                 <span class="min-w-0">
-                                    <span class="block truncate text-sm font-semibold text-slate-900">{{ $item->name }}</span>
-                                    <span class="block text-[11px] uppercase tracking-wide text-slate-400">{{ $item->item_type }} · {{ $item->quantity }} × @idr($item->price)</span>
+                                    <span class="block truncate text-sm font-semibold text-slate-900">{{ $item->item_description }}</span>
+                                    <span class="block text-[11px] uppercase tracking-wide text-slate-400">{{ $item->item_type }} · {{ $item->qty }} × @idr($item->price)</span>
                                 </span>
                                 <span class="shrink-0 text-sm font-bold text-slate-900">@idr($item->subtotal)</span>
                             </li>
@@ -115,35 +120,42 @@
                         @endforelse
                     </ul>
 
-                    @if ($group['rx'])
+                    @if ($group['prescriptions']->isNotEmpty())
                         <div class="mt-3 rounded-xl border border-slate-200 bg-white p-3">
                             <div class="mb-2 flex items-center justify-between text-[11px]">
                                 <span class="font-bold uppercase tracking-wider text-slate-700">Resep Kacamata</span>
-                                <span class="text-slate-400">{{ optional($group['rx']->examination_date)->format('d M Y') }}</span>
+                                <span class="text-slate-400">{{ $group['prescriptions']->first()->jenis_lensa ?: 'Umum' }}</span>
                             </div>
 
                             <div class="grid grid-cols-2 gap-3">
-                                @foreach (['od' => 'OD (Kanan)', 'os' => 'OS (Kiri)'] as $eye => $label)
-                                    <div class="rounded-lg bg-slate-50 p-2.5">
-                                        <p class="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $label }}</p>
-                                        <div class="grid grid-cols-2 gap-y-1 text-[11px]">
-                                            @foreach (['sph' => 'SPH', 'cyl' => 'CYL', 'axis' => 'AXIS', 'add' => 'ADD'] as $k => $lbl)
-                                                <span class="text-slate-500">{{ $lbl }}</span>
-                                                <span class="text-right font-mono font-bold text-slate-900">{{ $group['rx']->{$eye.'_'.$k} ?: '—' }}</span>
-                                            @endforeach
+                                @foreach (['R' => 'OD (Kanan)', 'L' => 'OS (Kiri)'] as $sisi => $label)
+                                    @php($rx = $group['prescriptions']->firstWhere('sisi', $sisi))
+                                    @if ($rx)
+                                        <div class="rounded-lg bg-slate-50 p-2.5">
+                                            <p class="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">{{ $label }}</p>
+                                            <div class="grid grid-cols-2 gap-y-1 text-[11px]">
+                                                @foreach (['sph' => 'SPH', 'cyl' => 'CYL', 'axis' => 'AXIS', 'add' => 'ADD'] as $k => $lbl)
+                                                    <span class="text-slate-500">{{ $lbl }}</span>
+                                                    <span class="text-right font-mono font-bold text-slate-900">{{ $rx->{$k} ?: '—' }}</span>
+                                                @endforeach
+                                            </div>
+                                            <p class="mt-1.5 truncate text-[10px] text-slate-400">
+                                                Lensa:
+                                                <span class="font-semibold text-slate-600">
+                                                    {{ $rx->itemno_lensa ? ($group['items']->firstWhere('itemno', $rx->itemno_lensa)?->item_description ?? '—') : '—' }}
+                                                </span>
+                                                · {{ $rx->qty }} lensa
+                                            </p>
                                         </div>
-                                    </div>
+                                    @endif
                                 @endforeach
                             </div>
 
                             <div class="mt-2 flex justify-between text-[11px] text-slate-500">
-                                <span>PD Total: <b class="text-slate-800">{{ $group['rx']->pd_total ?: '-' }} mm</b></span>
-                                <span>Fitting: <b class="text-slate-800">{{ $group['rx']->fitting_height ?: '-' }}</b></span>
+                                <span>PD: <b class="text-slate-800">{{ $group['prescriptions']->pluck('pd')->filter()->join(' / ') ?: '-' }}</b></span>
+                                <span>Sumber: <b class="text-slate-800">{{ $group['prescriptions']->first()->sourceLabel() }}</b></span>
                             </div>
-                            <p class="mt-1 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-400">
-                                <span>{{ $group['rx']->doctor_or_optician }}</span>
-                                <span class="rounded-full bg-slate-50 px-2 py-0.5 font-semibold text-slate-500">{{ $group['rx']->sourceLabel() }}</span>
-                            </p>
+                            <p class="mt-1 text-[11px] text-slate-400">{{ $group['prescriptions']->first()->resep ?: '-' }}</p>
                         </div>
                     @endif
                 </div>

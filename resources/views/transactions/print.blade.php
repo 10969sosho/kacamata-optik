@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Nota {{ $transaction->invoice_number }}</title>
+    <title>Nota {{ $transaction->sales_no }}</title>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -21,15 +21,14 @@
         <div class="rounded-2xl bg-white p-6 shadow-sm">
             <div class="border-b-2 border-dashed border-slate-300 pb-4 text-center">
                 <img src="{{ asset('images/logo.jpg') }}" alt="Logo" class="mx-auto mb-2 h-10 w-10 rounded-xl">
-                <p class="text-lg font-extrabold tracking-tight text-slate-900">{{ $transaction->store?->name ?? 'OPTIK' }}</p>
-                <p class="text-xs text-slate-500">{{ $transaction->store?->address ?? '' }}</p>
-                <p class="text-xs text-slate-500">{{ $transaction->store?->phone ?? '' }}</p>
+                <p class="text-lg font-extrabold tracking-tight text-slate-900">{{ config('app.name', 'OPTIK') }}</p>
+                <p class="text-xs text-slate-500">Nota Penjualan</p>
             </div>
 
             <div class="border-b border-dashed border-slate-300 py-4 text-xs">
-                <div class="flex justify-between"><span class="text-slate-500">No. Invoice</span><span class="font-bold text-slate-900">{{ $transaction->invoice_number }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Tanggal</span><span>{{ $transaction->transaction_date?->format('d/m/Y H:i') }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Kasir</span><span>{{ $transaction->staff?->name ?? '-' }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">No. Sales</span><span class="font-bold text-slate-900">{{ $transaction->sales_no }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Tanggal</span><span>{{ $transaction->sales_datetime }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Kasir</span><span>{{ $transaction->input_by }}</span></div>
                 <div class="flex justify-between"><span class="text-slate-500">Customer</span><span class="font-semibold">{{ $transaction->customer?->name ?? '-' }}</span></div>
                 @if ($transaction->customer)
                     <div class="flex justify-between"><span class="text-slate-500">Member</span><span class="font-mono">{{ $transaction->customer->member_id }}</span></div>
@@ -37,25 +36,7 @@
             </div>
 
             @php
-                $printGroups = $transaction->users()->get()
-                    ->map(fn ($user) => [
-                        'label' => $user->name,
-                        'status' => $user->statusLabel(),
-                        'ro1' => $user->ro1,
-                        'ro2' => $user->ro2,
-                        'items' => $transaction->items->where('transaction_user_id', $user->id)->values(),
-                    ])
-                    ->values();
-
-                $printUnassigned = $transaction->items->whereNull('transaction_user_id');
-
-                if ($printUnassigned->isNotEmpty()) {
-                    $printGroups->push(['label' => 'Umum', 'status' => null, 'ro1' => null, 'ro2' => null, 'items' => $printUnassigned->values()]);
-                }
-
-                if ($printGroups->isEmpty()) {
-                    $printGroups->push(['label' => $transaction->customer?->name ?? 'Umum', 'status' => null, 'ro1' => null, 'ro2' => null, 'items' => $transaction->items]);
-                }
+                $printGroups = $transaction->wearerGroups();
             @endphp
 
             <table class="w-full border-b border-dashed border-slate-300 py-2 text-xs">
@@ -72,9 +53,6 @@
                         <tr class="border-t border-slate-200">
                             <td colspan="4" class="pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                                 Pemakai: {{ $group['label'] }}
-                                @if ($group['status'])
-                                    <span class="text-slate-500">· {{ $group['status'] }}</span>
-                                @endif
                                 @if ($group['ro1'] || $group['ro2'])
                                     <span class="block font-normal normal-case tracking-normal text-slate-400">
                                         RO1: {{ $group['ro1'] ?: '-' }} · RO2: {{ $group['ro2'] ?: '-' }}
@@ -85,27 +63,50 @@
                         @foreach ($group['items'] as $item)
                             <tr>
                                 <td class="py-2 pr-2">
-                                    <p class="font-semibold text-slate-900">{{ $item->name }}</p>
-                                    @if ($item->frame?->sku || $item->lens?->sku || $item->accessory?->sku)
-                                        <p class="text-[10px] text-slate-400">{{ $item->frame?->sku ?? $item->lens?->sku ?? $item->accessory?->sku }}</p>
+                                    <p class="font-semibold text-slate-900">{{ $item->item_description }}</p>
+                                    @if ((float) $item->disc_percent > 0)
+                                        <p class="text-[10px] text-slate-400">Disc {{ rtrim(rtrim(number_format((float) $item->disc_percent, 2), '0'), '.') }}%</p>
                                     @endif
                                 </td>
-                                <td class="py-2 text-center">{{ $item->quantity }}</td>
+                                <td class="py-2 text-center">{{ $item->qty }}</td>
                                 <td class="py-2 text-right">@idr($item->price)</td>
                                 <td class="py-2 text-right font-semibold">@idr($item->subtotal)</td>
                             </tr>
                         @endforeach
+                        @if ($group['prescriptions']->isNotEmpty())
+                            <tr>
+                                <td colspan="4" class="pb-3 pt-1 text-[10px] text-slate-500">
+                                    <span class="font-bold uppercase tracking-wider text-slate-400">Resep:</span>
+                                    @foreach ($group['prescriptions'] as $rxRow)
+                                        <span class="ml-1">
+                                            {{ $rxRow->sisi }} · SPH {{ $rxRow->sph ?: '-' }} CYL {{ $rxRow->cyl ?: '-' }}
+                                            AXIS {{ $rxRow->axis ?: '-' }} ADD {{ $rxRow->add ?: '-' }} PD {{ $rxRow->pd ?: '-' }}
+                                        </span>
+                                    @endforeach
+                                    <span class="block">
+                                        Sumber: {{ $group['prescriptions']->first()->sourceLabel() }} · {{ $group['prescriptions']->first()->resep ?: '-' }}
+                                    </span>
+                                </td>
+                            </tr>
+                        @endif
                     @endforeach
                 </tbody>
             </table>
 
+            @php
+                $gross = $transaction->items->sum(fn ($item) => $item->gross());
+                $discount = $transaction->items->sum(fn ($item) => $item->discountAmount());
+            @endphp
+
             <div class="space-y-1.5 border-b border-dashed border-slate-300 py-4 text-xs">
-                <div class="flex justify-between"><span class="text-slate-500">Subtotal</span><span>@idr($transaction->subtotal)</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Diskon {{ $transaction->promotion?->name ? '· '.$transaction->promotion->name : '' }}</span><span class="text-rose-600">-@idr($transaction->discount_amount)</span></div>
-                <div class="flex justify-between text-base font-extrabold text-slate-900"><span>TOTAL</span><span>@idr($transaction->total_amount)</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Metode Bayar</span><span class="capitalize">{{ $transaction->payment_method }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Status Bayar</span><span class="font-bold {{ $transaction->payment_status === 'paid' ? 'text-red-600' : 'text-amber-600' }}">{{ $transaction->payment_status === 'paid' ? 'LUNAS' : 'DP / UANG MUKA' }}</span></div>
-                <div class="flex justify-between"><span class="text-slate-500">Status Pesanan</span><span class="capitalize">{{ $transaction->status }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Subtotal</span><span>@idr($gross)</span></div>
+                @if ($discount > 0)
+                    <div class="flex justify-between"><span class="text-slate-500">Diskon</span><span class="text-rose-600">-@idr($discount)</span></div>
+                @endif
+                <div class="flex justify-between text-base font-extrabold text-slate-900"><span>TOTAL</span><span>@idr($transaction->grandtotal)</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Metode Bayar</span><span class="capitalize">{{ $transaction->payment_by ?: '-' }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Status Bayar</span><span class="font-bold {{ $transaction->isPaid() ? 'text-red-600' : 'text-amber-600' }}">{{ $transaction->isPaid() ? 'LUNAS' : 'DP / UANG MUKA' }}</span></div>
+                <div class="flex justify-between"><span class="text-slate-500">Status Pesanan</span><span class="capitalize">{{ $transaction->sales_status }}</span></div>
                 @if ($transaction->balanceDue() > 0)
                     <div class="flex justify-between font-bold text-rose-600"><span>Sisa Tagihan</span><span>@idr($transaction->balanceDue())</span></div>
                 @endif

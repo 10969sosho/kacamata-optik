@@ -14,20 +14,20 @@
             <input type="date" name="to" value="{{ $filters['to'] ?? '' }}" class="rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
         </div>
         <div>
-            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Staff Kasir</label>
-            <select name="staff_id" class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
+            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Kasir</label>
+            <select name="input_by" class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                 <option value="">Semua</option>
                 @foreach ($staff as $s)
-                    <option value="{{ $s->id }}" @selected((string) ($filters['staff_id'] ?? '') === (string) $s->id)>{{ $s->name }}</option>
+                    <option value="{{ $s->name }}" @selected(($filters['input_by'] ?? '') === $s->name)>{{ $s->name }}</option>
                 @endforeach
             </select>
         </div>
         <div>
-            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Status Bayar</label>
-            <select name="payment_status" class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
+            <label class="mb-1 block text-[11px] font-semibold uppercase tracking-wider text-slate-500">Metode Bayar</label>
+            <select name="payment_by" class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                 <option value="">Semua</option>
-                @foreach (['paid' => 'Lunas', 'down_payment' => 'DP', 'unpaid' => 'Belum Bayar'] as $value => $label)
-                    <option value="{{ $value }}" @selected(($filters['payment_status'] ?? '') === $value)>{{ $label }}</option>
+                @foreach (['cash' => 'Cash', 'transfer' => 'Transfer', 'qris' => 'QRIS', 'card' => 'Kartu'] as $value => $label)
+                    <option value="{{ $value }}" @selected(($filters['payment_by'] ?? '') === $value)>{{ $label }}</option>
                 @endforeach
             </select>
         </div>
@@ -68,29 +68,29 @@
             <table class="w-full text-left text-sm">
                 <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
                     <tr>
-                        <th class="px-5 py-3">Invoice</th>
+                        <th class="px-5 py-3">No. Sales</th>
                         <th class="px-5 py-3">Tanggal</th>
                         <th class="px-5 py-3">Customer</th>
                         <th class="px-5 py-3">Kasir</th>
-                        <th class="px-5 py-3 text-right">Subtotal</th>
-                        <th class="px-5 py-3 text-right">Diskon</th>
-                        <th class="px-5 py-3 text-right">Net</th>
-                        <th class="px-5 py-3">Bayar</th>
+                        <th class="px-5 py-3 text-right">Grandtotal</th>
+                        <th class="px-5 py-3 text-right">Diskon Item</th>
+                        <th class="px-5 py-3">Metode</th>
+                        <th class="px-5 py-3">Status</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     @forelse ($rows as $trx)
                         <tr class="hover:bg-slate-50">
                             <td class="px-5 py-3">
-                                <a href="{{ route('transactions.show', $trx) }}" class="font-semibold text-slate-900 hover:text-red-600">{{ $trx->invoice_number }}</a>
+                                <a href="{{ route('transactions.show', $trx) }}" class="font-semibold text-slate-900 hover:text-red-600">{{ $trx->sales_no }}</a>
                             </td>
-                            <td class="px-5 py-3 text-slate-600">{{ optional($trx->transaction_date)->format('d/m/Y H:i') }}</td>
+                            <td class="px-5 py-3 text-slate-600">{{ $trx->sales_datetime }}</td>
                             <td class="px-5 py-3 text-slate-600">{{ $trx->customer?->name ?? '-' }}</td>
-                            <td class="px-5 py-3 text-slate-600">{{ $trx->staff?->name ?? '-' }}</td>
-                            <td class="px-5 py-3 text-right text-slate-700">@idr($trx->subtotal)</td>
-                            <td class="px-5 py-3 text-right text-rose-600">-@idr($trx->discount_amount)</td>
-                            <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($trx->total_amount)</td>
-                            <td class="px-5 py-3 capitalize text-slate-600">{{ $trx->payment_status }}</td>
+                            <td class="px-5 py-3 text-slate-600">{{ $trx->input_by }}</td>
+                            <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($trx->grandtotal)</td>
+                            <td class="px-5 py-3 text-right text-rose-600">-@idr($trx->items->sum(fn ($item) => $item->discountAmount()))</td>
+                            <td class="px-5 py-3 capitalize text-slate-600">{{ $trx->payment_by ?? '-' }}</td>
+                            <td class="px-5 py-3 capitalize text-slate-600">{{ $trx->sales_status }}</td>
                         </tr>
                     @empty
                         <tr><td colspan="8" class="px-5 py-10 text-center text-slate-400">Tidak ada data pada filter ini.</td></tr>

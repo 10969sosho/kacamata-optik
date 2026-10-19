@@ -2,88 +2,121 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Collection;
 
 class Transaction extends Model
 {
+    protected $primaryKey = 'sales_no';
+
+    public $incrementing = false;
+
+    /** @var string */
+    protected $keyType = 'string';
+
+    /**
+     * Status pesanan kacamata.
+     *
+     * @var list<string>
+     */
+    public const STATUSES = ['ordered', 'processing', 'ready', 'completed', 'cancelled', 'refunded'];
+
     /** @var list<string> */
     protected $fillable = [
-        'invoice_number',
-        'store_id',
-        'staff_id',
+        'sales_no',
+        'sales_date',
+        'sales_time',
         'customer_id',
-        'prescription_id',
-        'subtotal',
-        'discount_amount',
-        'promo_id',
-        'total_amount',
-        'payment_status',
-        'payment_method',
-        'status',
-        'notes',
-        'transaction_date',
+        'input_by',
+        'payment_by',
+        'edc_id',
+        'grandtotal',
+        'sales_notes',
+        'sales_status',
     ];
 
     /** @var array<string, string> */
     protected $casts = [
-        'subtotal' => 'decimal:2',
-        'discount_amount' => 'decimal:2',
-        'total_amount' => 'decimal:2',
-        'transaction_date' => 'datetime',
+        'sales_date' => 'date',
+        'grandtotal' => 'decimal:2',
     ];
-
-    public function store(): BelongsTo
-    {
-        return $this->belongsTo(Store::class);
-    }
-
-    public function staff(): BelongsTo
-    {
-        return $this->belongsTo(User::class, 'staff_id');
-    }
 
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
     }
 
-    public function prescription(): BelongsTo
-    {
-        return $this->belongsTo(Prescription::class);
-    }
-
-    public function promotion(): BelongsTo
-    {
-        return $this->belongsTo(Promotion::class, 'promo_id');
-    }
-
     /** @return HasMany<TransactionItem, $this> */
     public function items(): HasMany
     {
-        return $this->hasMany(TransactionItem::class);
+        return $this->hasMany(TransactionItem::class, 'sales_no', 'sales_no');
+    }
+
+    /** @return HasMany<TransactionPrescription, $this> */
+    public function prescriptions(): HasMany
+    {
+        return $this->hasMany(TransactionPrescription::class, 'sales_no', 'sales_no');
     }
 
     /** @return HasMany<Payment, $this> */
     public function payments(): HasMany
     {
-        return $this->hasMany(Payment::class);
+        return $this->hasMany(Payment::class, 'sales_no', 'sales_no');
+    }
+
+    protected function salesDateTime(): Attribute
+    {
+        return Attribute::get(fn (): string => ($this->sales_date?->format('d/m/Y') ?? '-').' '.substr((string) $this->sales_time, 0, 5));
     }
 
     /**
-     * Pemakai (user) yang itemnya tercatat pada transaksi ini.
+     * Item transaksi dikelompokkan per pemakai (username), termasuk kelompok
+     * "Umum" untuk item yang tidak terikat pemakai tertentu.
      *
-     * @return HasMany<TransactionUser, $this>
+     * @return Collection<int, array{label: string, items: Collection<int, TransactionItem>, prescriptions: Collection<int, TransactionPrescription>, ro1: ?string, ro2: ?string}>
      */
-    public function users(): HasMany
+    public function wearerGroups(): Collection
     {
-        return $this->hasMany(TransactionUser::class);
+        $rxBySortno = $this->prescriptions->groupBy(fn (TransactionPrescription $rx) => (string) $rx->sortno);
+
+        $groups = $this->items
+            ->groupBy(fn (TransactionItem $item) => (string) $item->username)
+            ->map(function (Collection $items, string $label) use ($rxBySortno): array {
+                $sortnos = $items->pluck('sortno')->map(fn ($sortno) => (string) $sortno);
+                $prescriptions = $rxBySortno
+                    ->filter(fn ($rows, string $sortno) => $sortnos->contains($sortno))
+                    ->flatten(1)
+                    ->values();
+
+                return [
+                    'label' => $label === '' ? 'Umum' : $label,
+                    'items' => $items->values(),
+                    'prescriptions' => $prescriptions,
+                    'ro1' => $prescriptions->first()?->ro1,
+                    'ro2' => $prescriptions->first()?->ro2,
+                ];
+            })
+            ->values();
+
+        if ($groups->isEmpty()) {
+            $groups->push([
+                'label' => $this->customer?->name ?? 'Umum',
+                'items' => collect(),
+                'prescriptions' => collect(),
+                'ro1' => null,
+                'ro2' => null,
+            ]);
+        }
+
+        return $groups;
     }
 
     public function isPaid(): bool
     {
-        return $this->payment_status === 'paid';
+        return $this->balanceDue() <= 0;
     }
 
     public function amountPaid(): float
@@ -93,6 +126,6 @@ class Transaction extends Model
 
     public function balanceDue(): float
     {
-        return max(0, (float) $this->total_amount - $this->amountPaid());
+        return max(0, (float) $this->grandtotal - $this->amountPaid());
     }
 }

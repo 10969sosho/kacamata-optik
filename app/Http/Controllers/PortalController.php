@@ -3,13 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
-use App\Models\Prescription;
 use App\Models\Promotion;
 use App\Models\Transaction;
-use App\Models\TransactionItem;
-use App\Models\TransactionUser;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 class PortalController extends Controller
@@ -20,7 +16,7 @@ class PortalController extends Controller
 
         return view('portal.dashboard', [
             'customer' => $customer,
-            'latestTransaction' => $customer->transactions()->with('items')->latest('transaction_date')->first(),
+            'latestTransaction' => $customer->transactions()->with('payments')->latest('sales_date')->latest('sales_no')->first(),
             'promotions' => Promotion::active()->latest()->take(3)->get(),
         ]);
     }
@@ -28,7 +24,7 @@ class PortalController extends Controller
     public function transactions(Request $request): View
     {
         return view('portal.transactions', [
-            'transactions' => $this->customer($request)->transactions()->with('items')->latest('transaction_date')->paginate(10),
+            'transactions' => $this->customer($request)->transactions()->with('items')->latest('sales_date')->latest('sales_no')->paginate(10),
         ]);
     }
 
@@ -41,11 +37,11 @@ class PortalController extends Controller
 
         abort_unless((int) $transaction->customer_id === (int) $customer->id, 404);
 
-        $transaction->load(['users.prescription', 'items', 'payments', 'promotion', 'store', 'customer']);
+        $transaction->load(['items', 'prescriptions', 'payments']);
 
         return view('portal.transaction-detail', [
             'transaction' => $transaction,
-            'groups' => $this->wearerGroups($transaction),
+            'groups' => $transaction->wearerGroups(),
         ]);
     }
 
@@ -54,58 +50,6 @@ class PortalController extends Controller
         return view('portal.promos', [
             'promotions' => Promotion::active()->orderByDesc('start_date')->paginate(10),
         ]);
-    }
-
-    /**
-     * Item transaksi dikelompokkan per pemakai (user), termasuk kelompok
-     * "Umum" untuk item yang tidak terikat pemakai tertentu.
-     *
-     * @return Collection<int, array{user: TransactionUser|null, label: string, status: ?string, status_label: ?string, ro1: ?string, ro2: ?string, rx: Prescription|null, items: Collection<int, TransactionItem>}>
-     */
-    private function wearerGroups(Transaction $transaction): Collection
-    {
-        $groups = $transaction->users
-            ->map(fn (TransactionUser $user): array => [
-                'user' => $user,
-                'label' => $user->name,
-                'status' => $user->status,
-                'status_label' => $user->statusLabel(),
-                'ro1' => $user->ro1,
-                'ro2' => $user->ro2,
-                'rx' => $user->prescription,
-                'items' => $transaction->items->where('transaction_user_id', $user->id)->values(),
-            ])
-            ->values();
-
-        $unassigned = $transaction->items->whereNull('transaction_user_id');
-
-        if ($unassigned->isNotEmpty()) {
-            $groups->push([
-                'user' => null,
-                'label' => 'Umum',
-                'status' => $transaction->status,
-                'status_label' => ucfirst($transaction->status),
-                'ro1' => null,
-                'ro2' => null,
-                'rx' => $transaction->prescription,
-                'items' => $unassigned->values(),
-            ]);
-        }
-
-        if ($groups->isEmpty()) {
-            $groups->push([
-                'user' => null,
-                'label' => $transaction->customer?->name ?? 'Umum',
-                'status' => $transaction->status,
-                'status_label' => ucfirst($transaction->status),
-                'ro1' => null,
-                'ro2' => null,
-                'rx' => $transaction->prescription,
-                'items' => $transaction->items,
-            ]);
-        }
-
-        return $groups;
     }
 
     private function customer(Request $request): Customer

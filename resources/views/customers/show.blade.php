@@ -53,8 +53,6 @@
                     @endforeach
                 </dl>
                 <div class="mt-5 flex gap-2">
-                    <a href="{{ route('prescriptions.create', ['customer_id' => $customer->id]) }}"
-                       class="flex-1 rounded-xl bg-slate-900 px-4 py-2.5 text-center text-xs font-bold text-white hover:bg-slate-800">+ Input Resep</a>
                     <a href="{{ route('pos.create') }}"
                        class="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-center text-xs font-bold text-white hover:bg-red-700">Buat Transaksi</a>
                 </div>
@@ -68,13 +66,16 @@
                     <h2 class="text-sm font-bold text-slate-900">Riwayat Resep Kacamata</h2>
                 </div>
                 <div class="divide-y divide-slate-100">
-                    @forelse ($customer->prescriptions as $rx)
-                        <a href="{{ route('prescriptions.show', $rx) }}" class="flex items-center justify-between px-5 py-4 hover:bg-slate-50">
+                    @forelse ($customer->transactionPrescriptions->groupBy(fn ($rx) => $rx->sales_no.':'.$rx->sortno) as $rows)
+                        @php($rx = $rows->first())
+                        <a href="{{ route('transactions.show', $rx->sales_no) }}" class="flex items-center justify-between px-5 py-4 hover:bg-slate-50">
                             <div>
-                                <p class="text-sm font-semibold text-slate-900">{{ $rx->doctor_or_optician }}</p>
-                                <p class="text-xs text-slate-500">{{ optional($rx->examination_date)->format('d M Y') }} · {{ $rx->prescription_type ?: 'Umum' }}</p>
+                                <p class="text-sm font-semibold text-slate-900">{{ $rx->resep ?: '-' }}</p>
+                                <p class="text-xs text-slate-500">{{ $rx->jenis_lensa ?: 'Umum' }} · {{ $rx->sourceLabel() }} · {{ $rx->transaction?->sales_date?->format('d M Y') }}</p>
                             </div>
-                            <span class="text-xs font-semibold text-slate-400">OD {{ $rx->od_sph }}/OS {{ $rx->os_sph }} →</span>
+                            <span class="text-xs font-semibold text-slate-400">
+                                R {{ $rows->firstWhere('sisi', 'R')?->sph ?: '—' }}/L {{ $rows->firstWhere('sisi', 'L')?->sph ?: '—' }} →
+                            </span>
                         </a>
                     @empty
                         <p class="px-5 py-8 text-center text-sm text-slate-400">Belum ada resep.</p>
@@ -90,7 +91,7 @@
                     <table class="w-full text-left text-sm">
                         <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
                             <tr>
-                                <th class="px-5 py-3">Invoice</th>
+                                <th class="px-5 py-3">No. Sales</th>
                                 <th class="px-5 py-3">Tanggal</th>
                                 <th class="px-5 py-3 text-right">Total</th>
                                 <th class="px-5 py-3">Bayar</th>
@@ -101,13 +102,13 @@
                             @forelse ($customer->transactions as $trx)
                                 <tr class="hover:bg-slate-50">
                                     <td class="px-5 py-3">
-                                        <a href="{{ route('transactions.show', $trx) }}" class="font-semibold text-slate-900 hover:text-red-600">{{ $trx->invoice_number }}</a>
+                                        <a href="{{ route('transactions.show', $trx) }}" class="font-semibold text-slate-900 hover:text-red-600">{{ $trx->sales_no }}</a>
                                     </td>
-                                    <td class="px-5 py-3 text-slate-600">{{ optional($trx->transaction_date)->format('d/m/Y') }}</td>
-                                    <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($trx->total_amount)</td>
-                                    <td class="px-5 py-3 text-slate-600"><span class="capitalize">{{ $trx->payment_status }}</span></td>
+                                    <td class="px-5 py-3 text-slate-600">{{ $trx->sales_date?->format('d/m/Y') }}</td>
+                                    <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($trx->grandtotal)</td>
+                                    <td class="px-5 py-3 text-slate-600"><span class="capitalize">{{ $trx->payment_by ?: '-' }}</span></td>
                                     <td class="px-5 py-3">
-                                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold capitalize text-slate-600">{{ $trx->status }}</span>
+                                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold capitalize text-slate-600">{{ $trx->sales_status }}</span>
                                     </td>
                                 </tr>
                             @empty

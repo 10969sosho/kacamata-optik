@@ -9,7 +9,6 @@ use App\Http\Controllers\ItemController;
 use App\Http\Controllers\LensController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\PosController;
-use App\Http\Controllers\PrescriptionController;
 use App\Http\Controllers\PromotionController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\TransactionController;
@@ -61,18 +60,11 @@ Route::middleware(['auth', 'role:admin,staff'])->group(function () {
     Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
     Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
 
-    Route::get('/prescriptions', [PrescriptionController::class, 'index'])->name('prescriptions.index');
-    Route::get('/prescriptions/create', [PrescriptionController::class, 'create'])->name('prescriptions.create');
-    Route::post('/prescriptions', [PrescriptionController::class, 'store'])->name('prescriptions.store');
-    Route::get('/prescriptions/{prescription}/edit', [PrescriptionController::class, 'edit'])->name('prescriptions.edit');
-    Route::put('/prescriptions/{prescription}', [PrescriptionController::class, 'update'])->name('prescriptions.update');
-    Route::get('/prescriptions/{prescription}', [PrescriptionController::class, 'show'])->name('prescriptions.show');
-
     Route::get('/transactions/create', [PosController::class, 'create'])->name('transactions.create');
     Route::get('/transactions', [TransactionController::class, 'index'])->name('transactions.index');
     Route::get('/transactions/{transaction}', [TransactionController::class, 'show'])->name('transactions.show');
     Route::patch('/transactions/{transaction}/status', [TransactionController::class, 'updateStatus'])->name('transactions.status');
-    Route::patch('/transactions/{transaction}/users/{transactionUser}', [TransactionController::class, 'updateUser'])->name('transactions.users.update');
+    Route::patch('/transactions/{transaction}/group', [TransactionController::class, 'updateGroup'])->name('transactions.group.update');
     Route::get('/transactions/{transaction}/print', [TransactionController::class, 'print'])->name('transactions.print');
 });
 

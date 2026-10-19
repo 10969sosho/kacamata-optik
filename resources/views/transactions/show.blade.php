@@ -1,55 +1,16 @@
 @extends('layouts.erp')
 
 @section('title', 'Detail Transaksi')
-@section('subtitle', $transaction->invoice_number)
+@section('subtitle', $transaction->sales_no)
 
 @section('content')
     @php
         $steps = ['ordered' => 'Dipesan', 'processing' => 'Diproses', 'ready' => 'Siap Diambil', 'completed' => 'Selesai'];
-        $current = array_search($transaction->status, array_keys($steps), true);
+        $current = array_search($transaction->sales_status, array_keys($steps), true);
 
-        $userStatusLabels = \App\Models\TransactionUser::STATUS_LABELS;
-
-        $wearerGroups = $transaction->users()->with('prescription')->get()
-            ->map(fn ($user) => [
-                'user' => $user,
-                'label' => $user->name,
-                'rx' => $user->prescription,
-                'status' => $user->statusLabel(),
-                'status_key' => $user->status,
-                'ro1' => $user->ro1,
-                'ro2' => $user->ro2,
-                'items' => $transaction->items->where('transaction_user_id', $user->id)->values(),
-            ])
-            ->values();
-
-        $unassigned = $transaction->items->whereNull('transaction_user_id');
-
-        if ($unassigned->isNotEmpty()) {
-            $wearerGroups->push([
-                'user' => null,
-                'label' => 'Umum',
-                'rx' => $transaction->prescription,
-                'status' => null,
-                'status_key' => null,
-                'ro1' => null,
-                'ro2' => null,
-                'items' => $unassigned->values(),
-            ]);
-        }
-
-        if ($wearerGroups->isEmpty()) {
-            $wearerGroups->push([
-                'user' => null,
-                'label' => $transaction->customer?->name ?? 'Umum',
-                'rx' => $transaction->prescription,
-                'status' => null,
-                'status_key' => null,
-                'ro1' => null,
-                'ro2' => null,
-                'items' => $transaction->items,
-            ]);
-        }
+        $wearerGroups = $transaction->wearerGroups();
+        $gross = $transaction->items->sum(fn ($item) => $item->gross());
+        $discount = $transaction->items->sum(fn ($item) => $item->discountAmount());
     @endphp
 
     <div class="mb-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -70,7 +31,7 @@
                     @endforeach
                 </div>
             @else
-                <span class="rounded-full bg-rose-100 px-3 py-1 text-xs font-bold uppercase text-rose-700">{{ $transaction->status }}</span>
+                <span class="rounded-full bg-rose-100 px-3 py-1 text-xs font-bold uppercase text-rose-700">{{ $transaction->sales_status }}</span>
             @endif
 
             <div class="flex flex-wrap items-center gap-2">
@@ -78,7 +39,7 @@
                     @csrf @method('PATCH')
                     <select name="status" class="rounded-xl border border-slate-200 px-3 py-2.5 text-sm focus:border-red-500 focus:outline-none">
                         @foreach (['ordered', 'processing', 'ready', 'completed', 'cancelled'] as $s)
-                            <option value="{{ $s }}" @selected($transaction->status === $s)>{{ ucfirst($s) }}</option>
+                            <option value="{{ $s }}" @selected($transaction->sales_status === $s)>{{ ucfirst($s) }}</option>
                         @endforeach
                     </select>
                     <button class="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white hover:bg-slate-800">Update</button>
@@ -98,45 +59,83 @@
                 <table class="w-full text-left text-sm">
                     <thead class="bg-slate-50 text-[11px] uppercase tracking-wider text-slate-500">
                         <tr>
+                            <th class="px-5 py-3">#</th>
                             <th class="px-5 py-3">Item</th>
                             <th class="px-5 py-3 text-center">Qty</th>
                             <th class="px-5 py-3 text-right">Harga</th>
+                            <th class="px-5 py-3 text-center">Disc</th>
                             <th class="px-5 py-3 text-right">Subtotal</th>
                         </tr>
                     </thead>
                     @foreach ($wearerGroups as $group)
                         <tbody>
                             <tr class="bg-red-50/60">
-                                <td colspan="4" class="px-5 py-2.5">
+                                <td colspan="6" class="px-5 py-2.5">
                                     <p class="text-[11px] font-bold uppercase tracking-wider text-red-700">
                                         Pemakai: {{ $group['label'] }}
-                                        @if ($group['rx'])
-                                            <a href="{{ route('prescriptions.show', $group['rx']) }}" class="ml-2 font-semibold normal-case text-red-600 underline">lihat resep</a>
-                                            <span class="ml-2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-slate-500">{{ $group['rx']->sourceLabel() }}</span>
+                                        @if ($group['prescriptions']->isNotEmpty())
+                                            <span class="ml-2 rounded-full bg-white px-2 py-0.5 text-[10px] font-semibold normal-case tracking-normal text-slate-500">
+                                                Resep: {{ $group['prescriptions']->first()->resep ?: '-' }} · {{ $group['prescriptions']->first()->jenis_lensa ?: 'Umum' }}
+                                            </span>
                                         @endif
                                     </p>
-                                    @if ($group['user'])
-                                        <p class="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-semibold normal-case text-red-700/80">
-                                            <span class="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-red-700">{{ $group['status'] }}</span>
+                                    @if ($group['ro1'] || $group['ro2'])
+                                        <p class="mt-1 text-[11px] font-semibold normal-case text-red-700/80">
                                             <span>RO1: {{ $group['ro1'] ?: '-' }}</span>
-                                            <span>RO2: {{ $group['ro2'] ?: '-' }}</span>
+                                            <span class="ml-3">RO2: {{ $group['ro2'] ?: '-' }}</span>
                                         </p>
                                     @endif
                                 </td>
                             </tr>
                             @forelse ($group['items'] as $item)
                                 <tr>
+                                    <td class="px-5 py-3 text-xs text-slate-400">{{ $item->sortno }}</td>
                                     <td class="px-5 py-3">
-                                        <p class="font-semibold text-slate-900">{{ $item->name }}</p>
+                                        <p class="font-semibold text-slate-900">{{ $item->item_description }}</p>
                                         <p class="text-xs uppercase text-slate-400">{{ $item->item_type }}</p>
                                     </td>
-                                    <td class="px-5 py-3 text-center text-slate-600">{{ $item->quantity }}</td>
+                                    <td class="px-5 py-3 text-center text-slate-600">{{ $item->qty }} {{ $item->unit }}</td>
                                     <td class="px-5 py-3 text-right text-slate-600">@idr($item->price)</td>
+                                    <td class="px-5 py-3 text-center text-slate-600">{{ rtrim(rtrim(number_format((float) $item->disc_percent, 2), '0'), '.') }}%</td>
                                     <td class="px-5 py-3 text-right font-semibold text-slate-900">@idr($item->subtotal)</td>
                                 </tr>
                             @empty
-                                <tr><td colspan="4" class="px-5 py-3 text-xs text-slate-400">Tidak ada item.</td></tr>
+                                <tr><td colspan="6" class="px-5 py-3 text-xs text-slate-400">Tidak ada item.</td></tr>
                             @endforelse
+
+                            @if ($group['prescriptions']->isNotEmpty())
+                                <tr class="bg-slate-50/60">
+                                    <td colspan="6" class="px-5 py-3">
+                                        <p class="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-500">Resep Kacamata</p>
+                                        <div class="grid gap-3 sm:grid-cols-2">
+                                            @foreach ($group['prescriptions'] as $rx)
+                                                <div class="rounded-xl border border-slate-200 bg-white p-3 text-xs">
+                                                    <p class="mb-1.5 font-bold uppercase tracking-wider text-slate-600">Sisi {{ $rx->sisi }} {{ $rx->sisi === 'R' ? '(Kanan)' : '(Kiri)' }}</p>
+                                                    <div class="grid grid-cols-2 gap-y-1">
+                                                        @foreach (['sph' => 'SPH', 'cyl' => 'CYL', 'axis' => 'AXIS', 'add' => 'ADD', 'pd' => 'PD'] as $key => $label)
+                                                            <span class="text-slate-500">{{ $label }}</span>
+                                                            <span class="text-right font-mono font-bold text-slate-900">{{ $rx->{$key} ?: '—' }}</span>
+                                                        @endforeach
+                                                    </div>
+                                                    <div class="mt-2 space-y-0.5 border-t border-slate-100 pt-2 text-[11px] text-slate-500">
+                                                        <p>
+                                                            Lensa:
+                                                            <span class="font-semibold text-slate-700">
+                                                                {{ $rx->itemno_lensa ? ($group['items']->firstWhere('itemno', $rx->itemno_lensa)?->item_description ?? '—') : '—' }}
+                                                            </span>
+                                                            · Qty {{ $rx->qty }}
+                                                        </p>
+                                                        <p>Sumber: <span class="font-semibold text-slate-700">{{ $rx->sourceLabel() }}</span></p>
+                                                    </div>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                        @if ($group['prescriptions']->first()->ket)
+                                            <p class="mt-2 text-[11px] text-slate-500">Catatan: {{ $group['prescriptions']->first()->ket }}</p>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endif
                         </tbody>
                     @endforeach
                 </table>
@@ -173,37 +172,27 @@
                                     <span class="block truncate text-sm font-semibold text-slate-900">{{ $group['label'] }}</span>
                                     <span class="block text-[11px] text-slate-500">{{ $group['items']->count() }} item</span>
                                 </span>
-                                @if ($group['rx'])
-                                    <a href="{{ route('prescriptions.show', $group['rx']) }}" class="shrink-0 text-[11px] font-semibold text-red-600 hover:underline">Resep</a>
-                                @endif
                             </div>
 
-                            @if ($group['user'])
-                                <form method="POST" action="{{ route('transactions.users.update', [$transaction, $group['user']]) }}" class="mt-3 space-y-2.5 border-t border-slate-100 pt-3">
+                            @if ($group['prescriptions']->isNotEmpty())
+                                <form method="POST" action="{{ route('transactions.group.update', $transaction) }}" class="mt-3 space-y-2.5 border-t border-slate-100 pt-3">
                                     @csrf @method('PATCH')
-                                    <label class="block">
-                                        <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">Status Pesanan</span>
-                                        <select name="status" class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs font-semibold focus:border-red-500 focus:outline-none">
-                                            @foreach ($userStatusLabels as $key => $label)
-                                                <option value="{{ $key }}" @selected($group['status_key'] === $key)>{{ $label }}</option>
-                                            @endforeach
-                                        </select>
-                                    </label>
+                                    <input type="hidden" name="username" value="{{ $group['label'] }}">
 
                                     <div class="grid gap-2">
                                         <label class="block">
                                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">RO1 · Periksa Mata</span>
-                                            <input type="text" name="ro1" maxlength="120" value="{{ old("ro1.{$group['user']->id}", $group['ro1']) }}" placeholder="Nama petugas refraksi"
+                                            <input type="text" name="ro1" maxlength="120" value="{{ old("ro1.{$group['label']}", $group['ro1']) }}" placeholder="Nama petugas refraksi"
                                                    class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs focus:border-red-500 focus:outline-none">
                                         </label>
                                         <label class="block">
                                             <span class="mb-1 block text-[10px] font-bold uppercase tracking-wider text-slate-500">RO2 · Potong Lensa</span>
-                                            <input type="text" name="ro2" maxlength="120" value="{{ old("ro2.{$group['user']->id}", $group['ro2']) }}" placeholder="Nama petugas lensa"
+                                            <input type="text" name="ro2" maxlength="120" value="{{ old("ro2.{$group['label']}", $group['ro2']) }}" placeholder="Nama petugas lensa"
                                                    class="w-full rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-xs focus:border-red-500 focus:outline-none">
                                         </label>
                                     </div>
 
-                                    <button class="w-full rounded-lg bg-red-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-red-700">Simpan Pemakai</button>
+                                    <button class="w-full rounded-lg bg-red-600 px-3 py-2 text-[11px] font-bold text-white hover:bg-red-700">Simpan Petugas</button>
                                 </form>
                             @endif
                         </li>
@@ -216,15 +205,15 @@
             <div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                 <h2 class="mb-4 text-sm font-bold text-slate-900">Ringkasan</h2>
                 <dl class="space-y-2.5 text-sm">
-                    <div class="flex justify-between"><dt class="text-slate-500">Subtotal</dt><dd class="font-semibold text-slate-800">@idr($transaction->subtotal)</dd></div>
-                    <div class="flex justify-between"><dt class="text-slate-500">Diskon {!! $transaction->promotion ? '('.e($transaction->promotion->name).')' : '' !!}</dt><dd class="font-semibold text-rose-600">-@idr($transaction->discount_amount)</dd></div>
-                    <div class="flex justify-between border-t border-slate-100 pt-2.5 text-base font-extrabold"><dt class="text-slate-900">Total</dt><dd class="text-slate-900">@idr($transaction->total_amount)</dd></div>
+                    <div class="flex justify-between"><dt class="text-slate-500">Subtotal</dt><dd class="font-semibold text-slate-800">@idr($gross)</dd></div>
+                    <div class="flex justify-between"><dt class="text-slate-500">Diskon</dt><dd class="font-semibold text-rose-600">-@idr($discount)</dd></div>
+                    <div class="flex justify-between border-t border-slate-100 pt-2.5 text-base font-extrabold"><dt class="text-slate-900">Grandtotal</dt><dd class="text-slate-900">@idr($transaction->grandtotal)</dd></div>
                     <div class="flex justify-between"><dt class="text-slate-500">Dibayar</dt><dd class="font-semibold text-red-600">@idr($transaction->amountPaid())</dd></div>
                     <div class="flex justify-between"><dt class="text-slate-500">Sisa Tagihan</dt><dd class="font-semibold text-rose-600">@idr($transaction->balanceDue())</dd></div>
                 </dl>
                 <div class="mt-4 flex flex-wrap gap-2 text-[11px] font-semibold uppercase tracking-wider">
-                    <span class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 capitalize">{{ $transaction->payment_method }}</span>
-                    <span class="rounded-full px-2.5 py-1 {{ $transaction->payment_status === 'paid' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">{{ $transaction->payment_status }}</span>
+                    <span class="rounded-full bg-slate-100 px-2.5 py-1 text-slate-600 capitalize">{{ $transaction->payment_by ?: '-' }}</span>
+                    <span class="rounded-full px-2.5 py-1 {{ $transaction->isPaid() ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700' }}">{{ $transaction->isPaid() ? 'Lunas' : 'DP' }}</span>
                 </div>
             </div>
 
@@ -236,10 +225,7 @@
                     <p class="mt-1 font-mono text-xs font-bold text-red-700">{{ $transaction->customer->member_id }}</p>
                     <a href="{{ route('customers.show', $transaction->customer) }}" class="mt-3 block text-xs font-semibold text-red-600 hover:underline">Lihat profil →</a>
                 @endif
-                @if ($transaction->prescription)
-                    <a href="{{ route('prescriptions.show', $transaction->prescription) }}" class="mt-3 block text-xs font-semibold text-red-600 hover:underline">Lihat resep terkait →</a>
-                @endif
-                <p class="mt-4 text-xs text-slate-400">Kasir: {{ $transaction->staff?->name ?? '-' }} · {{ $transaction->store?->name ?? '-' }}</p>
+                <p class="mt-4 text-xs text-slate-400">Kasir: {{ $transaction->input_by }} · {{ $transaction->sales_datetime }}</p>
             </div>
         </div>
     </div>

@@ -13,9 +13,9 @@ class CustomerController extends Controller
     {
         $customers = Customer::query()
             ->withCount('transactions')
-            ->withSum(['transactions as total_spending' => fn ($q) => $q->whereNotIn('status', ['cancelled', 'refunded'])], 'total_amount')
-            ->withMax(['transactions as last_transaction_at' => fn ($q) => $q->whereNotIn('status', ['cancelled', 'refunded'])], 'transaction_date')
-            ->withMax('prescriptions as last_exam_at', 'examination_date')
+            ->withSum(['transactions as total_spending' => fn ($q) => $q->whereNotIn('sales_status', ['cancelled', 'refunded'])], 'grandtotal')
+            ->withMax(['transactions as last_transaction_at' => fn ($q) => $q->whereNotIn('sales_status', ['cancelled', 'refunded'])], 'sales_date')
+            ->withMax(['transactions as last_exam_at' => fn ($q) => $q->whereHas('prescriptions')], 'sales_date')
             ->when($request->filled('q'), fn ($q) => $q->where(
                 fn ($w) => $w->where('name', 'like', "%{$request->string('q')}%")
                     ->orWhere('phone', 'like', "%{$request->string('q')}%")
@@ -58,8 +58,8 @@ class CustomerController extends Controller
     public function show(Customer $customer): View
     {
         $customer->load([
-            'prescriptions' => fn ($q) => $q->latest('examination_date'),
-            'transactions' => fn ($q) => $q->with('items')->latest('transaction_date'),
+            'transactionPrescriptions' => fn ($q) => $q->orderByDesc('transactions.sales_date'),
+            'transactions' => fn ($q) => $q->with('items')->latest('sales_date'),
         ]);
 
         return view('customers.show', ['customer' => $customer]);

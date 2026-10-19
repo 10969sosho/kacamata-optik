@@ -21,7 +21,6 @@
                         <th class="px-5 py-3 text-right">Nilai</th>
                         <th class="px-5 py-3 text-right">Min. Belanja</th>
                         <th class="px-5 py-3">Periode</th>
-                        <th class="px-5 py-3 text-center">Pakai</th>
                         <th class="px-5 py-3">Status</th>
                         <th class="px-5 py-3 text-right">Aksi</th>
                     </tr>
@@ -46,7 +45,6 @@
                                 {{ $promo->start_date?->format('d/m/Y') ?? 'Mulai kapan saja' }}<br>
                                 s/d {{ $promo->end_date?->format('d/m/Y') ?? 'Tanpa batas' }}
                             </td>
-                            <td class="px-5 py-3 text-center text-slate-600">{{ $promo->transactions_count }}</td>
                             <td class="px-5 py-3">
                                 <span class="rounded-full px-2.5 py-1 text-[11px] font-bold {{ $promo->is_active ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-500' }}">
                                     {{ $promo->is_active ? 'AKTIF' : 'NONAKTIF' }}

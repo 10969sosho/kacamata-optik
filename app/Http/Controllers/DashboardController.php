@@ -17,15 +17,15 @@ class DashboardController extends Controller
     {
         $today = now()->toDateString();
         $startOfMonth = now()->startOfMonth()->toDateString();
-        $billable = fn () => Transaction::query()->whereNotIn('status', ['cancelled', 'refunded']);
+        $billable = fn () => Transaction::query()->whereNotIn('sales_status', ['cancelled', 'refunded']);
 
-        $monthQuery = $billable()->whereBetween('transaction_date', [$startOfMonth.' 00:00:00', now()->endOfDay()]);
-        $salesToday = (float) $billable()->whereDate('transaction_date', $today)->sum('total_amount');
-        $salesMonth = (float) $monthQuery->sum('total_amount');
+        $monthQuery = $billable()->whereBetween('sales_date', [$startOfMonth, $today]);
+        $salesToday = (float) $billable()->whereDate('sales_date', $today)->sum('grandtotal');
+        $salesMonth = (float) $monthQuery->sum('grandtotal');
         $monthCount = $monthQuery->count();
 
         $repeatIds = Customer::query()
-            ->withCount(['transactions as orders_count' => fn ($q) => $q->whereNotIn('status', ['cancelled', 'refunded'])])
+            ->withCount(['transactions as orders_count' => fn ($q) => $q->whereNotIn('sales_status', ['cancelled', 'refunded'])])
             ->get()
             ->filter(fn (Customer $c) => $c->orders_count > 1)
             ->pluck('id');
@@ -40,10 +40,11 @@ class DashboardController extends Controller
             'repeatOrders' => $billable()->whereIn('customer_id', $repeatIds)->count(),
             'lowStockFrames' => Frame::whereColumn('stock', '<=', 'min_stock')->orderBy('stock')->limit(6)->get(),
             'lowStockLenses' => Lens::whereColumn('stock', '<=', 'min_stock')->orderBy('stock')->limit(6)->get(),
-            'topFrames' => $this->topSellers('frame_id', Frame::class, 'frames'),
-            'topLenses' => $this->topSellers('lens_id', Lens::class, 'lenses'),
-            'recentTransactions' => Transaction::with(['customer', 'staff'])
-                ->latest('transaction_date')
+            'topFrames' => $this->topSellers('frame', Frame::class, 'frames'),
+            'topLenses' => $this->topSellers('lens', Lens::class, 'lenses'),
+            'recentTransactions' => Transaction::with('customer')
+                ->latest('sales_date')
+                ->latest('sales_no')
                 ->limit(8)
                 ->get(),
             'dailyTrend' => $this->dailyTrend($billable),
@@ -60,8 +61,8 @@ class DashboardController extends Controller
     private function dailyTrend(\Closure $billable): Collection
     {
         $totals = $billable()
-            ->where('transaction_date', '>=', now()->subDays(13)->startOfDay())
-            ->selectRaw('date(transaction_date) as day, SUM(total_amount) as total')
+            ->where('sales_date', '>=', now()->subDays(13)->toDateString())
+            ->selectRaw('sales_date as day, SUM(grandtotal) as total')
             ->groupBy('day')
             ->pluck('total', 'day');
 
@@ -84,8 +85,8 @@ class DashboardController extends Controller
     private function monthlyTrend(\Closure $billable): Collection
     {
         $totals = $billable()
-            ->where('transaction_date', '>=', now()->subMonths(5)->startOfMonth())
-            ->selectRaw('date(transaction_date) as day, SUM(total_amount) as total')
+            ->where('sales_date', '>=', now()->subMonths(5)->startOfMonth()->toDateString())
+            ->selectRaw('sales_date as day, SUM(grandtotal) as total')
             ->groupBy('day')
             ->pluck('total', 'day')
             ->groupBy(fn ($value, string $day) => substr($day, 0, 7));
@@ -104,12 +105,13 @@ class DashboardController extends Controller
      * @param  class-string<Model>  $model
      * @return Collection<int, Model>
      */
-    private function topSellers(string $column, string $model, string $table): Collection
+    private function topSellers(string $itemType, string $model, string $table): Collection
     {
         return $model::query()
             ->select("{$table}.*")
-            ->selectRaw('COALESCE(SUM(transaction_items.quantity), 0) as sold')
-            ->leftJoin('transaction_items', fn ($join) => $join->on("{$table}.id", '=', "transaction_items.{$column}"))
+            ->selectRaw('COALESCE(SUM(transaction_items.qty), 0) as sold')
+            ->leftJoin('transaction_items', fn ($join) => $join->on("{$table}.id", '=', 'transaction_items.itemno')
+                ->where('transaction_items.item_type', $itemType))
             ->groupBy("{$table}.id")
             ->orderByDesc('sold')
             ->limit(5)

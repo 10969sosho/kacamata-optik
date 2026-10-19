@@ -9,7 +9,7 @@ class Payment extends Model
 {
     /** @var list<string> */
     protected $fillable = [
-        'transaction_id',
+        'sales_no',
         'amount',
         'payment_method',
         'reference_number',
@@ -25,6 +25,6 @@ class Payment extends Model
 
     public function transaction(): BelongsTo
     {
-        return $this->belongsTo(Transaction::class);
+        return $this->belongsTo(Transaction::class, 'sales_no', 'sales_no');
     }
 }

@@ -10,13 +10,15 @@ return new class extends Migration
     {
         Schema::create('payments', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('transaction_id')->constrained('transactions')->cascadeOnDelete();
+            $table->string('sales_no');
             $table->decimal('amount', 12, 2);
             $table->string('payment_method');
             $table->string('reference_number')->nullable();
             $table->dateTime('paid_at');
             $table->string('note')->nullable();
             $table->timestamps();
+
+            $table->foreign('sales_no')->references('sales_no')->on('transactions')->cascadeOnDelete();
         });
     }
 

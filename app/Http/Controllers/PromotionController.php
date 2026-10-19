@@ -12,7 +12,7 @@ class PromotionController extends Controller
     public function index(): View
     {
         return view('promotions.index', [
-            'promotions' => Promotion::withCount('transactions')->latest()->paginate(10),
+            'promotions' => Promotion::latest()->paginate(10),
         ]);
     }
 

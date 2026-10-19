@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 class Customer extends Model
 {
@@ -33,10 +34,21 @@ class Customer extends Model
         return $this->belongsTo(User::class);
     }
 
-    /** @return HasMany<Prescription, $this> */
-    public function prescriptions(): HasMany
+    /**
+     * Resep kacamata tersimpan pada transaksi customer ini.
+     *
+     * @return HasManyThrough<TransactionPrescription, Transaction, $this>
+     */
+    public function transactionPrescriptions(): HasManyThrough
     {
-        return $this->hasMany(Prescription::class);
+        return $this->hasManyThrough(
+            TransactionPrescription::class,
+            Transaction::class,
+            'customer_id',
+            'sales_no',
+            'id',
+            'sales_no',
+        );
     }
 
     /** @return HasMany<Transaction, $this> */
@@ -57,14 +69,9 @@ class Customer extends Model
         return $code;
     }
 
-    public function latestPrescription(): ?Prescription
-    {
-        return $this->prescriptions()->latest('examination_date')->first();
-    }
-
     public function totalSpend(): float
     {
-        return (float) $this->billableTransactions()->sum('total_amount');
+        return (float) $this->billableTransactions()->sum('grandtotal');
     }
 
     public function totalOrders(): int
@@ -79,6 +86,6 @@ class Customer extends Model
      */
     protected function billableTransactions(): HasMany
     {
-        return $this->transactions()->whereNotIn('status', ['cancelled', 'refunded']);
+        return $this->transactions()->whereNotIn('sales_status', ['cancelled', 'refunded']);
     }
 }

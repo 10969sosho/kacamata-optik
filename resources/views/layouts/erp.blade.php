@@ -62,7 +62,6 @@
                 {!! $item('dashboard', 'layout-dashboard', 'Dashboard') !!}
                 {!! $item('transactions.index', 'receipt-text', 'Transaksi') !!}
                 {!! $item('customers.index', 'users', 'Customer') !!}
-                {!! $item('prescriptions.index', 'file-heart', 'Resep') !!}
             @endif
 
             @if ($isAdmin)
