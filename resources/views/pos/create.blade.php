@@ -236,6 +236,9 @@ function pos() {
             return {
                 _k: ++this.seq,
                 name: name || '',
+                selectedCat: '',
+                selectedItemKey: '',
+                itemSearch: '',
                 q: '', cat: '',
                 items: lines,
                 rx_mode: snap.rx_ref ? 'existing' : 'new',
@@ -287,6 +290,42 @@ function pos() {
                 if (q && ![item.name, item.brand, item.sku, item.category].some(v => (v || '').toLowerCase().includes(q))) return false;
                 return this.inUserCart(user, item) || this.stockLeft(item) > 0;
             });
+        },
+
+        itemsByCategory(user) {
+            if (!user.selectedCat) return [];
+            const q = (user.itemSearch || '').toLowerCase();
+            return this.items.filter(item => {
+                if (item.category !== user.selectedCat) return false;
+                if (q && ![item.name, item.brand, item.sku].some(v => (v || '').toLowerCase().includes(q))) return false;
+                return true;
+            });
+        },
+
+        selectItemFromDropdown(index) {
+            const user = this.users[index];
+            if (!user || !user.selectedItemKey) return;
+
+            const [type, idStr] = user.selectedItemKey.split(':');
+            const id = parseInt(idStr, 10);
+            const item = this.catalogItem(type, id);
+
+            if (!item) {
+                user.selectedItemKey = '';
+                return;
+            }
+
+            // Jika item berkategori Lensa, langsung buka pop-up resep lensa
+            if (item.type === 'lens' || (item.category || '').toLowerCase().includes('lensa')) {
+                this.openRx(index, item.id);
+                user.selectedItemKey = '';
+                return;
+            }
+
+            // Untuk item non-lensa, langsung tambahkan ke keranjang pengguna
+            this.addItem(index, item);
+            user.selectedItemKey = '';
+            user.itemSearch = '';
         },
 
         addItem(index, item) {
@@ -482,35 +521,59 @@ function pos() {
                                     RO2: <span class="text-slate-700" x-text="u.ro2 || '-'"></span>
                                 </p>
 
-                                <!-- pemilihan item -->
-                                <p class="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">Pilih item untuk pemakai ini</p>
-                                <div class="mb-2 flex flex-wrap gap-1.5">
-                                    <button type="button" @click="u.cat = ''"
-                                            class="rounded-full border px-3 py-1 text-[11px] font-bold"
-                                            :class="u.cat === '' ? 'border-red-600 bg-red-600 text-white' : 'border-slate-200 bg-white text-slate-500'">Semua</button>
-                                    <template x-for="cat in categories" :key="cat">
-                                        <button type="button" @click="u.cat = cat"
-                                                class="rounded-full border px-3 py-1 text-[11px] font-bold"
-                                                :class="u.cat === cat ? 'border-red-600 bg-red-600 text-white' : 'border-slate-200 bg-white text-slate-500'"
-                                                x-text="cat"></button>
-                                    </template>
-                                </div>
-                                <input x-model="u.q" type="text" placeholder="Cari frame, lensa, softlens, case..."
-                                       class="mb-2 w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm focus:border-red-500 focus:outline-none">
-
-                                <div class="grid max-h-60 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
-                                    <template x-for="it in pickerItems(u)" :key="it.type + '-' + it.id">
-                                        <button type="button" @click="addItem(ui, it)"
-                                                class="flex items-center justify-between gap-2 rounded-xl border px-3 py-2.5 text-left transition"
-                                                :class="inUserCart(u, it) ? 'border-red-400 bg-red-50' : 'border-slate-200 bg-white hover:border-slate-300'">
-                                            <span class="min-w-0">
-                                                <span class="block truncate text-xs font-semibold text-slate-900" x-text="it.name"></span>
-                                                <span class="block truncate text-[11px] text-slate-500" x-text="it.category + ' · sisa ' + stockLeft(it)"></span>
-                                            </span>
-                                            <span class="shrink-0 text-xs font-bold text-slate-900" x-text="fmt(it.price)"></span>
+                                <!-- Pemilihan Item: Dropdown Kategori lalu Dropdown Pilih Item -->
+                                <div class="rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+                                    <div class="mb-3 flex items-center justify-between">
+                                        <p class="text-xs font-bold uppercase tracking-wider text-slate-700">Pilih Item untuk Pemakai Ini</p>
+                                        <button type="button" @click="openRx(ui)"
+                                                class="text-xs font-bold text-red-600 hover:text-red-700 hover:underline">
+                                            + Form Resep Lensa
                                         </button>
-                                    </template>
-                                    <p x-show="!pickerItems(u).length" class="col-span-full rounded-xl bg-white px-3 py-4 text-center text-xs text-slate-400">Tidak ada item cocok / stok habis.</p>
+                                    </div>
+
+                                    <div class="grid gap-3 sm:grid-cols-2">
+                                        <!-- 1. Dropdown Kategori -->
+                                        <div class="min-w-0">
+                                            <label class="mb-1.5 block text-xs font-bold text-slate-700">1. Pilih Kategori</label>
+                                            <select x-model="u.selectedCat" @change="u.selectedItemKey = ''; u.itemSearch = ''"
+                                                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20">
+                                                <option value="">— Pilih Kategori —</option>
+                                                <template x-for="cat in categories" :key="cat">
+                                                    <option :value="cat" x-text="cat"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+
+                                        <!-- 2. Dropdown Pilih Item -->
+                                        <div class="min-w-0">
+                                            <label class="mb-1.5 block text-xs font-bold text-slate-700">2. Pilih Item</label>
+                                            <div class="space-y-1.5">
+                                                <input x-show="u.selectedCat && (itemsByCategory(u).length > 5 || u.itemSearch)"
+                                                       x-model="u.itemSearch" type="text" placeholder="Ketik untuk filter nama item..."
+                                                       class="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs focus:border-red-500 focus:outline-none">
+
+                                                <div class="flex items-center gap-2">
+                                                    <select x-model="u.selectedItemKey" @change="selectItemFromDropdown(ui)" :disabled="!u.selectedCat"
+                                                            class="min-w-0 flex-1 truncate rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
+                                                        <option value="">— <span x-text="u.selectedCat ? 'Pilih Item ' + u.selectedCat : 'Pilih Kategori Terlebih Dahulu'"></span> —</option>
+                                                        <template x-for="it in itemsByCategory(u)" :key="it.type + '-' + it.id">
+                                                            <option :value="it.type + ':' + it.id"
+                                                                    :disabled="stockLeft(it) < 1 && !inUserCart(u, it)"
+                                                                    x-text="it.name + ' · ' + fmt(it.price) + ' (sisa ' + stockLeft(it) + ')' + (stockLeft(it) < 1 ? ' [HABIS]' : '')"></option>
+                                                        </template>
+                                                    </select>
+
+                                                    <button type="button" @click="selectItemFromDropdown(ui)" :disabled="!u.selectedItemKey"
+                                                            class="shrink-0 rounded-xl bg-red-600 px-3.5 py-2.5 text-xs font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40">
+                                                        + Tambah
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <p x-show="u.selectedCat && !itemsByCategory(u).length" class="mt-1.5 text-[11px] text-amber-600">
+                                                Tidak ada item yang cocok di kategori ini.
+                                            </p>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <!-- item terpilih -->
