@@ -9,10 +9,10 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('transaction_items', function (Blueprint $table) {
-            $table->string('sales_no');
+            $table->string('sales_no', 64);
             $table->integer('sortno')->comment('Urutan item per transaksi, mulai dari 1');
-            $table->string('itemno')->comment('ID item (frame/lens/accessory) sebagai string');
-            $table->string('item_type');
+            $table->string('itemno', 50)->comment('ID item (frame/lens/accessory) sebagai string');
+            $table->string('item_type', 20);
             $table->string('item_description');
             $table->string('username')->nullable()->comment('Nama pemakai kacamata');
             $table->integer('qty')->default(1);

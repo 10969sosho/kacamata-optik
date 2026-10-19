@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('transaction_prescriptions', function (Blueprint $table) {
-            $table->string('sales_no');
+            $table->string('sales_no', 64);
             $table->integer('sortno')->comment('Merujuk sortno di transaction_items');
             $table->string('itemno_lensa')->nullable();
             $table->string('item_type')->nullable();

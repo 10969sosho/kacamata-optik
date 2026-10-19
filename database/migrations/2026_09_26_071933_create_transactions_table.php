@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('transactions', function (Blueprint $table) {
-            $table->string('sales_no')->primary();
+            $table->string('sales_no', 64)->primary();
             $table->date('sales_date');
             $table->time('sales_time');
             $table->foreignId('customer_id')->nullable()->constrained('customers')->nullOnDelete();
