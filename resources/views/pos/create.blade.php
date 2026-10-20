@@ -237,9 +237,8 @@ function pos() {
                 _k: ++this.seq,
                 name: name || '',
                 selectedCat: '',
-                selectedItemKey: '',
                 itemSearch: '',
-                q: '', cat: '',
+                itemOpen: false,
                 items: lines,
                 rx_mode: snap.rx_ref ? 'existing' : 'new',
                 rx_ref: snap.rx_ref || '',
@@ -293,39 +292,30 @@ function pos() {
         },
 
         itemsByCategory(user) {
-            if (!user.selectedCat) return [];
-            const q = (user.itemSearch || '').toLowerCase();
+            const cat = user.selectedCat;
+            const q = (user.itemSearch || '').toLowerCase().trim();
             return this.items.filter(item => {
-                if (item.category !== user.selectedCat) return false;
-                if (q && ![item.name, item.brand, item.sku].some(v => (v || '').toLowerCase().includes(q))) return false;
+                if (cat && item.category !== cat) return false;
+                if (q && ![item.name, item.brand, item.sku, item.category].some(v => (v || '').toLowerCase().includes(q))) return false;
                 return true;
             });
         },
 
-        selectItemFromDropdown(index) {
+        pickItem(index, item) {
             const user = this.users[index];
-            if (!user || !user.selectedItemKey) return;
+            if (!user || !item) return;
 
-            const [type, idStr] = user.selectedItemKey.split(':');
-            const id = parseInt(idStr, 10);
-            const item = this.catalogItem(type, id);
-
-            if (!item) {
-                user.selectedItemKey = '';
-                return;
-            }
+            user.itemOpen = false;
+            user.itemSearch = '';
 
             // Jika item berkategori Lensa, langsung buka pop-up resep lensa
             if (item.type === 'lens' || (item.category || '').toLowerCase().includes('lensa')) {
                 this.openRx(index, item.id);
-                user.selectedItemKey = '';
                 return;
             }
 
-            // Untuk item non-lensa, langsung tambahkan ke keranjang pengguna
+            // Untuk item non-lensa, langsung tambahkan ke keranjang pemakai
             this.addItem(index, item);
-            user.selectedItemKey = '';
-            user.itemSearch = '';
         },
 
         addItem(index, item) {
@@ -535,43 +525,65 @@ function pos() {
                                         <!-- 1. Dropdown Kategori -->
                                         <div class="min-w-0">
                                             <label class="mb-1.5 block text-xs font-bold text-slate-700">1. Pilih Kategori</label>
-                                            <select x-model="u.selectedCat" @change="u.selectedItemKey = ''; u.itemSearch = ''"
-                                                    class="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20">
-                                                <option value="">— Pilih Kategori —</option>
-                                                <template x-for="cat in categories" :key="cat">
-                                                    <option :value="cat" x-text="cat"></option>
-                                                </template>
-                                            </select>
-                                        </div>
-
-                                        <!-- 2. Dropdown Pilih Item -->
-                                        <div class="min-w-0">
-                                            <label class="mb-1.5 block text-xs font-bold text-slate-700">2. Pilih Item</label>
-                                            <div class="space-y-1.5">
-                                                <input x-show="u.selectedCat && (itemsByCategory(u).length > 5 || u.itemSearch)"
-                                                       x-model="u.itemSearch" type="text" placeholder="Ketik untuk filter nama item..."
-                                                       class="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs focus:border-red-500 focus:outline-none">
-
-                                                <div class="flex items-center gap-2">
-                                                    <select x-model="u.selectedItemKey" @change="selectItemFromDropdown(ui)" :disabled="!u.selectedCat"
-                                                            class="min-w-0 flex-1 truncate rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400">
-                                                        <option value="">— <span x-text="u.selectedCat ? 'Pilih Item ' + u.selectedCat : 'Pilih Kategori Terlebih Dahulu'"></span> —</option>
-                                                        <template x-for="it in itemsByCategory(u)" :key="it.type + '-' + it.id">
-                                                            <option :value="it.type + ':' + it.id"
-                                                                    :disabled="stockLeft(it) < 1 && !inUserCart(u, it)"
-                                                                    x-text="it.name + ' · ' + fmt(it.price) + ' (sisa ' + stockLeft(it) + ')' + (stockLeft(it) < 1 ? ' [HABIS]' : '')"></option>
-                                                        </template>
-                                                    </select>
-
-                                                    <button type="button" @click="selectItemFromDropdown(ui)" :disabled="!u.selectedItemKey"
-                                                            class="shrink-0 rounded-xl bg-red-600 px-3.5 py-2.5 text-xs font-bold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-40">
-                                                        + Tambah
-                                                    </button>
+                                            <div class="relative">
+                                                <select x-model="u.selectedCat" @change="u.itemSearch = ''; u.itemOpen = false"
+                                                        class="w-full appearance-none rounded-xl border border-slate-200 bg-white py-2.5 pl-3.5 pr-10 text-sm font-semibold text-slate-800 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20">
+                                                    <option value="">— Semua Kategori —</option>
+                                                    <template x-for="cat in categories" :key="cat">
+                                                        <option :value="cat" x-text="cat"></option>
+                                                    </template>
+                                                </select>
+                                                <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400">
+                                                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                    </svg>
                                                 </div>
                                             </div>
-                                            <p x-show="u.selectedCat && !itemsByCategory(u).length" class="mt-1.5 text-[11px] text-amber-600">
-                                                Tidak ada item yang cocok di kategori ini.
-                                            </p>
+                                        </div>
+
+                                        <!-- 2. Search & Dropdown (1 Paket 1 Tempat) -->
+                                        <div class="relative min-w-0" @click.outside="u.itemOpen = false">
+                                            <label class="mb-1.5 block text-xs font-bold text-slate-700">2. Cari & Pilih Item</label>
+                                            <div class="relative">
+                                                <input type="text"
+                                                       x-model="u.itemSearch"
+                                                       @focus="u.itemOpen = true"
+                                                       @click="u.itemOpen = true"
+                                                       @keydown.escape="u.itemOpen = false"
+                                                       :placeholder="u.selectedCat ? 'Ketik nama item ' + u.selectedCat + '...' : 'Ketik nama / brand item...'"
+                                                       class="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-3.5 pr-10 text-sm font-semibold text-slate-800 placeholder:text-slate-400 focus:border-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/20">
+
+                                                <button type="button"
+                                                        @click="u.itemOpen = !u.itemOpen"
+                                                        class="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 hover:text-slate-600 focus:outline-none">
+                                                    <svg class="h-4 w-4 transition-transform duration-200" :class="u.itemOpen ? 'rotate-180 text-red-600' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                                    </svg>
+                                                </button>
+                                            </div>
+
+                                            <!-- Floating dropdown popup list -->
+                                            <div x-show="u.itemOpen"
+                                                 x-cloak
+                                                 class="absolute left-0 right-0 z-30 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
+                                                <template x-for="it in itemsByCategory(u)" :key="it.type + '-' + it.id">
+                                                    <button type="button"
+                                                            @click="pickItem(ui, it)"
+                                                            :disabled="stockLeft(it) < 1 && !inUserCart(u, it)"
+                                                            class="flex w-full items-center justify-between gap-2.5 rounded-lg px-3 py-2 text-left transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40">
+                                                        <span class="min-w-0 flex-1">
+                                                            <span class="block truncate text-xs font-bold text-slate-900" x-text="it.name"></span>
+                                                            <span class="block truncate text-[11px] text-slate-500"
+                                                                  x-text="it.category + ' · sisa ' + stockLeft(it) + (stockLeft(it) < 1 ? ' [HABIS]' : '')"></span>
+                                                        </span>
+                                                        <span class="shrink-0 text-xs font-bold text-slate-900" x-text="fmt(it.price)"></span>
+                                                    </button>
+                                                </template>
+
+                                                <div x-show="!itemsByCategory(u).length" class="px-3 py-4 text-center text-xs text-slate-400">
+                                                    Tidak ada item yang cocok dengan pencarian.
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
